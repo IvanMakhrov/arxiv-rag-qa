@@ -1,0 +1,23 @@
+# environment
+.venv/
+
+# S3
+S3/
+
+# env
+.env
+
+# files
+*.pdf
+
+# Python files
+__pycache__
+
+# Airflow runtime dirs
+/config/*
+/logs/*
+/plugins/*
+
+!config/
+!logs/
+!plugins/

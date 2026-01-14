@@ -1,0 +1,6 @@
+[core]
+    remote = minio_storage
+['remote "minio_storage"']
+    url = s3://arxiv-pdf
+    endpointurl = http://localhost:9000
+    ssl_verify = false
