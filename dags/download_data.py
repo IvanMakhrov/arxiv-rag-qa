@@ -7,7 +7,6 @@ from urllib.parse import quote
 import mlflow
 import requests
 from airflow import DAG
-from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 
@@ -28,13 +27,13 @@ default_args = {
     "depends_on_past": False,
     "email_on_failure": False,
     "retries": 2,
-    "retry_delay": timedelta(minutes=2),
+    "retry_delay": timedelta(seconds=10),
 }
 
 
 def fetch_arxiv_pdfs(**context):
     """Download NLP papers from arXiv"""
-    Path(RAW_PDF_DIR).mkdir(parents=True)
+    Path(RAW_PDF_DIR).mkdir(parents=True, exist_ok=True)
 
     downloaded = set()
     start_index = 0
@@ -58,7 +57,7 @@ def fetch_arxiv_pdfs(**context):
         )
 
         print(
-            f"→ Requesting papers {start_index}-{start_index + batch_size - 1} "
+            f"Requesting papers {start_index}-{start_index + batch_size - 1} "
             f"(total so far: {len(downloaded)})"
         )
 
@@ -93,19 +92,19 @@ def fetch_arxiv_pdfs(**context):
                     else:
                         print(f"Already exists: {paper_id}")
                     downloaded.add(paper_id)
+                    time.sleep(1)
             except Exception as e:
                 print(f"Error processing {paper_id}: {e}")
                 continue
 
         start_index += batch_size
-        time.sleep(3)
 
         if len(entries) < batch_size:
             print("Reached end of results")
             break
 
     downloaded_list = sorted(list(downloaded))
-    full_paths = [Path(RAW_PDF_DIR) / f"{pid}.pdf" for pid in downloaded_list]
+    full_paths = [str(Path(RAW_PDF_DIR) / f"{pid}.pdf") for pid in downloaded_list]
 
     context["ti"].xcom_push(key="downloaded_pdfs", value=full_paths)
     print(f"\nTotal papers: {len(full_paths)}")
@@ -142,17 +141,4 @@ with DAG(
         python_callable=log_mlflow,
     )
 
-    dvc_track_task = BashOperator(
-        task_id="dvc_track_data",
-        bash_command="""
-        set -a
-        source .env
-        set +a
-        cd /opt/airflow && \
-        dvc add data/raw && \
-        git add data/*.dvc && \
-        git commit -m 'Update arXiv NLP dataset''
-        """,
-    )
-
-    fetch_task >> parse_task >> dvc_track_task
+    fetch_task >> parse_task

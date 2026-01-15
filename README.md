@@ -27,5 +27,6 @@ MLFlow:<br> http://localhost:5050
 
 ```bash
 export $(grep -v '^#' .env | xargs)
+dvc add data/raw
 dvc push
 ```
