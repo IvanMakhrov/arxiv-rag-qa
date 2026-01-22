@@ -1,0 +1,5 @@
+defaults:
+  - download: download
+  - chunking: chunking
+  - dag: dag
+  - _self_

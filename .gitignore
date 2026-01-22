@@ -1,9 +1,6 @@
 # environment
 .venv/
 
-# S3
-S3/
-
 # env
 .env
 
@@ -21,3 +18,10 @@ __pycache__
 !config/
 !logs/
 !plugins/
+
+# build
+arxiv_rag_qa.egg-info/
+
+# data
+data/raw
+data/processed

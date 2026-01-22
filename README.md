@@ -23,6 +23,8 @@ AirFlow:<br> http://localhost:8080
 
 MLFlow:<br> http://localhost:5050
 
+Api:<br> http://localhost:8000
+
 ## Пушим pdf в S3
 
 ```bash
@@ -30,3 +32,11 @@ export $(grep -v '^#' .env | xargs)
 dvc add data/raw
 dvc push
 ```
+
+## Настройка AirFlow для Api
+
+В AirFlow UI заходим в Admin - Connections<br>
+
+- Connection_id - http_conn_id в HTTPOperator
+- Connection Type - HTTP
+- Host - http://chunking-service:8000. Имя сервиса и порт в docker-compose.yml
