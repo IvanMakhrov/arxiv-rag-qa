@@ -1,0 +1,2 @@
+json_embeddings: data/processed/basic_chunks_embeddings.jsonl
+model_name: all-MiniLM-L6-v2

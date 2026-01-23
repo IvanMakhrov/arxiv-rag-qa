@@ -116,6 +116,18 @@ services:
       timeout: 5s
       retries: 3
 
+  qdrant:
+    image: qdrant/qdrant:v1.10.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__TELEMETRY_DISABLED=true
+      - RUST_LOG=info
+    restart: unless-stopped
+
   airflow-webserver:
     <<: *airflow-common
     command: webserver

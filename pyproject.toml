@@ -23,6 +23,7 @@ api = [
   "redis>=7.1.0",
   "requests>=2.32.5",
   "pymupdf>=1.26.7",
+  "sentence-transformers>=5.2.0",
 ]
 
 airflow = [
@@ -45,6 +46,7 @@ dev = [
   "ruff>=0.14.10",
   "apache-airflow==2.10.1",
   "ipykernel>=7.1.0",
+  "qdrant-client>=1.12.1",
 ]
 
 [tool.setuptools.packages.find]

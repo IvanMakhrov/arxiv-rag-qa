@@ -25,6 +25,8 @@ MLFlow:<br> http://localhost:5050
 
 Api:<br> http://localhost:8000
 
+Qdrant:<br> http://localhost:6333<br> http://localhost:6333/dashboard<br>
+
 ## Пушим pdf в S3
 
 ```bash

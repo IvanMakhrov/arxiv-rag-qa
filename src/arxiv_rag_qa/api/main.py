@@ -3,10 +3,12 @@ import logging
 from fastapi import FastAPI, HTTPException
 
 from arxiv_rag_qa.api.download_model import DownloadRequest, DownloadResponse
+from arxiv_rag_qa.api.embeddings_model import EmbeddingsRequest, EmbeddingsResponse
 from arxiv_rag_qa.api.parse_model import ParseRequest, ParseResponse
 from arxiv_rag_qa.api.process_model import ProcessRequest, ProcessResponse
 from arxiv_rag_qa.data.chunking import process_all_papers_to_chunks
 from arxiv_rag_qa.data.download_data import fetch_arxiv_pdfs
+from arxiv_rag_qa.data.generate_embeddings import generate_embeddings
 from arxiv_rag_qa.data.parse_pdf_to_json import parse_pdfs_to_json
 
 # Logging setup
@@ -63,4 +65,19 @@ def process_all_papers(request: ProcessRequest):
         return ProcessResponse(total_chunks=total_chunks, output_file=request.output_chunks_path)
     except Exception as e:
         logger.error(f"Processing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/embeddings", response_model=EmbeddingsResponse)
+def create_embeddings(request: EmbeddingsRequest):
+    """Download and parse arXiv papers."""
+    try:
+        count = generate_embeddings(
+            json_chunks=request.json_chunks,
+            json_embeddings=request.json_embeddings,
+            model_name=request.model_name,
+        )
+        return EmbeddingsResponse(embeddings_number=count, output_dir=str(request.json_embeddings))
+    except Exception as e:
+        logger.error(f"Parsing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

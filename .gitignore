@@ -25,3 +25,4 @@ arxiv_rag_qa.egg-info/
 # data
 data/raw
 data/processed
+qdrant_storage/

@@ -1,5 +1,6 @@
 defaults:
   - download: download
   - chunking: chunking
+  - embeddings: embeddings
   - dag: dag
   - _self_

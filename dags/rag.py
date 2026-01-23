@@ -78,4 +78,19 @@ with DAG(
         response_check=lambda response: response.status_code == cfg.dag.response_check,
     )
 
-    download_data >> parse_pdf_to_json >> trigger_chunking
+    create_embeddings = HttpOperator(
+        task_id="create_embeddings",  # Name of DAG in AirFlow UI
+        http_conn_id=cfg.dag.http_conn_id,  # Connection_id в AirFlow UI
+        endpoint="/embeddings",  # Router
+        method="POST",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "json_chunks": cfg.chunking.output_path,
+                "json_embeddings": cfg.embeddings.json_embeddings,
+                "model_name": cfg.embeddings.model_name,
+            }
+        ),
+        response_check=lambda response: response.status_code == cfg.dag.response_check,
+    )
+    download_data >> parse_pdf_to_json >> trigger_chunking >> create_embeddings
