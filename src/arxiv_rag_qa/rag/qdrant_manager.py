@@ -95,8 +95,3 @@ class QdrantManager:
         """One-time setup: create collection + ingest data."""
         self.create_collection()
         self.add_data()
-
-
-if __name__ == "__main__":
-    qdrant = QdrantManager()
-    qdrant.setup()

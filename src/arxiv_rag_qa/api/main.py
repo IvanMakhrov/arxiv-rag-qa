@@ -6,10 +6,12 @@ from arxiv_rag_qa.api.download_model import DownloadRequest, DownloadResponse
 from arxiv_rag_qa.api.embeddings_model import EmbeddingsRequest, EmbeddingsResponse
 from arxiv_rag_qa.api.parse_model import ParseRequest, ParseResponse
 from arxiv_rag_qa.api.process_model import ProcessRequest, ProcessResponse
+from arxiv_rag_qa.api.qdrant_model import QdrantRequest, QdrantResponse
 from arxiv_rag_qa.data.chunking import process_all_papers_to_chunks
 from arxiv_rag_qa.data.download_data import fetch_arxiv_pdfs
 from arxiv_rag_qa.data.generate_embeddings import generate_embeddings
 from arxiv_rag_qa.data.parse_pdf_to_json import parse_pdfs_to_json
+from arxiv_rag_qa.rag.qdrant_manager import QdrantManager
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -70,7 +72,7 @@ def process_all_papers(request: ProcessRequest):
 
 @app.post("/embeddings", response_model=EmbeddingsResponse)
 def create_embeddings(request: EmbeddingsRequest):
-    """Download and parse arXiv papers."""
+    """Create embeddings of chunked data texts"""
     try:
         count = generate_embeddings(
             json_chunks=request.json_chunks,
@@ -78,6 +80,26 @@ def create_embeddings(request: EmbeddingsRequest):
             model_name=request.model_name,
         )
         return EmbeddingsResponse(embeddings_number=count, output_dir=str(request.json_embeddings))
+    except Exception as e:
+        logger.error(f"Parsing failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/qdrant_setup", response_model=DownloadResponse)
+def qdrant_setup(request: QdrantRequest):
+    """Setup Qdrant db"""
+    try:
+        qdrant = QdrantManager(
+            host=request.host,
+            port=request.port,
+            collection_name=request.collection_name,
+            vector_size=request.vector_size,
+        )
+        qdrant.setup()
+        return QdrantResponse(
+            collection_name=request.collection_name,
+            vector_size=request.vector_size,
+        )
     except Exception as e:
         logger.error(f"Parsing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
