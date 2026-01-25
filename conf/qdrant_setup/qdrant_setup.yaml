@@ -1,0 +1,4 @@
+host: localhost
+post: 6333
+collection_name: arxiv_rag
+vector_size: 384

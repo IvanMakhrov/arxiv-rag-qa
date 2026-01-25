@@ -8,12 +8,12 @@ from arxiv_rag_qa.rag.retriever import DenseRetriever
 def main():
     embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-    def embedding_func(x):
+    def embedding_model(x):
         return embedder.encode(x, normalize_embeddings=True).tolist()
 
     retriever = DenseRetriever(
         collection_name="arxiv_rag",
-        embedding_model=embedding_func,
+        embedding_model=embedding_model,
         top_k=5,
     )
     generator = QwenGenerator(

@@ -3,4 +3,7 @@ defaults:
   - chunking: chunking
   - embeddings: embeddings
   - dag: dag
+  - qdrant_setup: qdrant_setup
+  - generator: generator
+  - retriever: retriever
   - _self_
