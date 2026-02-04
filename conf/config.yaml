@@ -6,4 +6,7 @@ defaults:
   - qdrant_setup: qdrant_setup
   - generator: generator
   - retriever: retriever
+  - test_data: test_data
+  - qdrant: qdrant
+  - eval: eval
   - _self_

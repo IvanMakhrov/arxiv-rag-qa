@@ -1,0 +1,2 @@
+test_file: data/processed/test_questions.jsonl
+bertscore_model: roberta-base

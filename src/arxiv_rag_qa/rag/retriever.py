@@ -42,9 +42,9 @@ class DenseRetriever:
         k = top_k or self.top_k
         query_vector = self.embed(query)
 
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=filter_,
             limit=k,
             with_payload=with_payload,
@@ -57,7 +57,7 @@ class DenseRetriever:
                 "score": hit.score,
                 "payload": hit.payload,
             }
-            for hit in results
+            for hit in results.points
         ]
 
     def batch_retrieve(

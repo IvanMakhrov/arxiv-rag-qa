@@ -1,6 +1,7 @@
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as rest
@@ -8,43 +9,30 @@ from qdrant_client.models import PointStruct
 
 
 class QdrantManager:
-    _instance: Optional["QdrantManager"] = None
-    _initialized: bool = False
-
-    def __new__(
-        cls,
-        host: str = "localhost",
-        port: int = 6333,
-        collection_name: str = "arxiv_rag",
-        vector_size: int = 384,
-    ):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._host = host
-            cls._instance._port = port
-            cls._instance._collection_name = collection_name
-            cls._instance._vector_size = vector_size
-            cls._initialized = True
-        else:
-            pass
-        return cls._instance
-
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 6333,
-        collection_name: str = "arxiv_rag",
-        vector_size: int = 384,
+        host: str = "",
+        port: int = 0,
+        collection_name: str = "",
+        vector_size: int = 0,
+        file_path: str = "",
+        timeout: int = 5,
+        batch_size: int = 256,
     ):
-        if self._initialized:
-            return
-        self._client: QdrantClient | None = None
-        self._initialized = True
+        self.host = host
+        self.port = port
+        self.collection_name = collection_name
+        self.vector_size = vector_size
+        self.file_path = file_path
+        self.timeout = timeout
+        self.batch_size = batch_size
+
+        self._client = None
 
     @property
     def client(self) -> QdrantClient:
         if self._client is None:
-            self._client = QdrantClient(host=self._host, port=self._port)
+            self._client = QdrantClient(host=self.host, port=self.port, timeout=self.timeout)
         return self._client
 
     def read_file(self, file_name: str) -> list[dict[str, Any]]:
@@ -57,39 +45,55 @@ class QdrantManager:
                     records.append(record)
         return records
 
+    def _read_jsonl_lines(self) -> Iterator[dict[str, Any]]:
+        """Generator that yields one record at a time from the JSONL file."""
+        file_path = Path(self.file_path)
+
+        with file_path.open("r", encoding="utf-8") as f:
+            for chunk in f:
+                line = chunk.strip()
+                if line:
+                    yield json.loads(line)
+
     def create_collection(self) -> None:
-        if self.client.collection_exists(self._collection_name):
-            print(f"Collection '{self._collection_name}' already exists.")
+        if self.client.collection_exists(self.collection_name):
+            print(f"Collection '{self.collection_name}' already exists.")
             return
 
         self.client.create_collection(
-            collection_name=self._collection_name,
+            collection_name=self.collection_name,
             vectors_config=rest.VectorParams(
-                size=self._vector_size,
+                size=self.vector_size,
                 distance=rest.Distance.COSINE,
                 on_disk=True,
             ),
             hnsw_config=rest.HnswConfigDiff(m=16, ef_construct=100),
         )
-        print(f"Collection '{self._collection_name}' created successfully!")
+        print(f"Collection '{self.collection_name}' created successfully!")
 
     def add_data(self) -> None:
-        file_path = (
-            Path(__file__).parent.parent / "data" / "processed" / "basic_chunks_embeddings.jsonl"
-        )
-        chunks = self.read_file(str(file_path))
+        batch = []
+        point_id = 0
 
-        points = [
-            PointStruct(
-                id=i,
-                vector=chunk["embedding"],
-                payload={"text": chunk["text"], **chunk["metadata"]},
+        for record in self._read_jsonl_lines():
+            point = PointStruct(
+                id=point_id,
+                vector=record["embedding"],
+                payload={"text": record["text"], **record["metadata"]},
             )
-            for i, chunk in enumerate(chunks)
-        ]
+            batch.append(point)
+            point_id += 1
 
-        self.client.upsert(collection_name=self._collection_name, points=points)
-        print(f"Inserted {len(points)} points into '{self._collection_name}'.")
+            if len(batch) >= self.batch_size:
+                self.client.upsert(collection_name=self.collection_name, points=batch)
+                print(f"Upserted batch of {len(batch)} points (up to ID {point_id - 1})")
+                batch = []
+
+        if batch:
+            self.client.upsert(collection_name=self.collection_name, points=batch)
+            print(f"Upserted final batch of {len(batch)} points")
+
+        print(f"Total {point_id} points inserted into '{self.collection_name}'.")
 
     def setup(self) -> None:
         """One-time setup: create collection + ingest data."""

@@ -93,4 +93,28 @@ with DAG(
         ),
         response_check=lambda response: response.status_code == cfg.dag.response_check,
     )
-    download_data >> parse_pdf_to_json >> trigger_chunking >> create_embeddings
+
+    generate_test_data = HttpOperator(
+        task_id="generate_test_data",  # Name of DAG in AirFlow UI
+        http_conn_id=cfg.dag.http_conn_id,  # Connection_id в AirFlow UI
+        endpoint="/generate-test-data",  # Router
+        method="POST",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "chunks_path": cfg.embeddings.json_embeddings,
+                "test_data_path": cfg.test_data.output_path,
+                "metadata_path": cfg.download.metadata_path,
+                "test_data_size": cfg.test_data.test_data_size,
+            }
+        ),
+        response_check=lambda response: response.status_code == cfg.dag.response_check,
+    )
+
+    (
+        download_data
+        >> parse_pdf_to_json
+        >> trigger_chunking
+        >> create_embeddings
+        >> generate_test_data
+    )
