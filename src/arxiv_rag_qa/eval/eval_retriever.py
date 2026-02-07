@@ -85,8 +85,6 @@ def retriever_eval(
     avg_mrr = sum(mrr_scores) / len(mrr_scores)
     avg_hit = sum(hit_rates) / len(hit_rates)
 
-    print("\n\nRetrieval Evaluation Results")
-    print("=" * 40)
     print(f"Top-k: {top_k}")
     print(f"Recall@{top_k}:   {avg_recall:.4f}")
     print(f"MRR@{top_k}:      {avg_mrr:.4f}")

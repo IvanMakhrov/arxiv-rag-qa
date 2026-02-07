@@ -106,8 +106,6 @@ def generator_eval(
     bert_f1 = compute_bertscore(predictions, references, bertscore_model)
     faithfulness = compute_faithfulness(predictions, contexts)
 
-    print("\n📊 Generator Evaluation Results")
-    print("=" * 40)
     print(f"ROUGE-L:      {rouge['rougeL']:.4f}")
     print(f"BLEU:         {bleu:.4f}")
     print(f"BERTScore F1: {bert_f1:.4f}")
