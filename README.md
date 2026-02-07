@@ -74,8 +74,7 @@ docker compose up
 - Кеширование: Redis
 - Контроль качества кода: Ruff
 - Hooks: pre-commit
-- Гиперпараметры: Hydr
-- Api: FastApi
+- Гиперпараметры: Hydra
 
 ## UI:
 
