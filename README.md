@@ -36,7 +36,7 @@ docker compose up
 
 ## 2. Настраиваем .env файл
 
-Структура файла .env:<br>
+Структура файла .env:
 
 ```text
 AIRFLOW_UID - user ID в airflow контейнере
@@ -57,6 +57,8 @@ POSTGRES_DB - имя БД в postgres
 ```python
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
+
+## 3. Настройка соединения в AirFlow
 
 В AirFlow UI заходим в Admin - Connections:<br>
 
