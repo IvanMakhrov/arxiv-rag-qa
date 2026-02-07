@@ -1,2 +1,2 @@
-output_path: data/processed/test_questions.jsonl
+test_data_dir: data/processed/test_questions.jsonl
 test_data_size: 100

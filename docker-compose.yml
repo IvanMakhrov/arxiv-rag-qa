@@ -24,6 +24,7 @@ x-airflow-common: &airflow-common
     - ${AIRFLOW_PROJ_DIR:-.}/src:/opt/airflow/src
     - ${AIRFLOW_PROJ_DIR:-.}:/opt/airflow/project
     - ${AIRFLOW_PROJ_DIR:-.}/conf:/opt/airflow/conf
+    - ${AIRFLOW_PROJ_DIR:-.}/utils:/opt/airflow/utils
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     postgres:

@@ -21,15 +21,15 @@ def fetch_arxiv_pdfs(
     start_date: str = "",
     target_count: int = 0,
     results_per_request: int = 0,
-    raw_pdf_dir: str = "",
-    metadata_path: str = "",
+    pdf_dir: str = "",
+    metadata_dir: str = "",
 ) -> list[dict]:
     """
     Download arXiv papers as PDFs and return metadata list.
     Does NOT parse to JSON.
     """
-    raw_pdf_dir = Path(raw_pdf_dir)
-    raw_pdf_dir.mkdir(parents=True, exist_ok=True)
+    pdf_dir = Path(pdf_dir)
+    pdf_dir.mkdir(parents=True, exist_ok=True)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -86,7 +86,7 @@ def fetch_arxiv_pdfs(
                     author.find("{http://www.w3.org/2005/Atom}name").text
                     for author in entry.findall("{http://www.w3.org/2005/Atom}author")
                 ]
-                pdf_path = raw_pdf_dir / f"{paper_id}.pdf"
+                pdf_path = pdf_dir / f"{paper_id}.pdf"
 
                 if paper_id not in downloaded:
                     if not pdf_path.exists():
@@ -116,6 +116,6 @@ def fetch_arxiv_pdfs(
             break
 
         metadata_list = [downloaded[pid] for pid in downloaded]
-        save_metadata(metadata_list, metadata_path)
+        save_metadata(metadata_list, metadata_dir)
 
     return len(list(downloaded.values()))

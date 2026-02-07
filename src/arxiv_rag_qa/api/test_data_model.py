@@ -2,12 +2,15 @@ from pydantic import BaseModel
 
 
 class TestDataRequest(BaseModel):
-    chunks_path: str
-    test_data_path: str
-    metadata_path: str
+    chunk_dir: str
+    test_data_dir: str
+    metadata_dir: str
     test_data_size: int
 
 
 class TestDataResponse(BaseModel):
-    test_data_path: str
     message: str
+    chunk_dir: str
+    test_data_dir: str
+    metadata_dir: str
+    test_data_size: int

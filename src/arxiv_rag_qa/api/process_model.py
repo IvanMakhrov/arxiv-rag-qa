@@ -1,13 +1,17 @@
 from pydantic import BaseModel
 
 
-class ProcessRequest(BaseModel):
-    raw_json_dir: str
-    output_chunks_path: str
+class ChunkRequest(BaseModel):
+    chunk_dir: str
+    json_dir: str
     chunk_size: int
     chunk_overlap: int
 
 
-class ProcessResponse(BaseModel):
+class ChunkResponse(BaseModel):
+    message: str
     total_chunks: int
-    output_file: str
+    chunk_dir: str
+    json_dir: str
+    chunk_size: int
+    chunk_overlap: int

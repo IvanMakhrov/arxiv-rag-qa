@@ -60,7 +60,7 @@ def compute_faithfulness(answers: list[str], contexts: list[str]) -> float:
 
 
 def generator_eval(
-    test_file: str,
+    test_data_dir: str,
     collection_name: str,
     top_k: int,
     emb_model_name: str,
@@ -69,7 +69,7 @@ def generator_eval(
     qdrant_host: str,
     qdrant_port: int,
 ):
-    test_samples = load_test_set(test_file)
+    test_samples = load_test_set(test_data_dir)
 
     embedder = SentenceTransformer(emb_model_name)
 
@@ -118,7 +118,7 @@ def generator_eval(
             "emb_model": emb_model_name,
             "gen_model": gen_model_name,
             "top_k": top_k,
-            "test_file": test_file,
+            "test_file": test_data_dir,
         },
         "metrics": {
             "rougeL": rouge["rougeL"],

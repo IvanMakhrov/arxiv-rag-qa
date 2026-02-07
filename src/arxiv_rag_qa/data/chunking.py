@@ -44,8 +44,8 @@ def split_text_recursive(text: str, chunk_size: int = 512, chunk_overlap: int = 
 
 
 def process_all_papers_to_chunks(
-    raw_json_dir: str,
-    output_chunks_path: str,
+    json_dir: str,
+    chunk_dir: str,
     chunk_size: int = 512,
     chunk_overlap: int = 50,
 ) -> int:
@@ -53,13 +53,13 @@ def process_all_papers_to_chunks(
     Process all JSON files into chunks and save as JSONL.
     Returns total number of chunks.
     """
-    output_chunks_path = Path(output_chunks_path)
-    raw_json_dir = Path(raw_json_dir)
-    output_chunks_path.parent.mkdir(parents=True, exist_ok=True)
-    json_files = list(raw_json_dir.glob("*.json"))
+    chunk_dir = Path(chunk_dir)
+    json_dir = Path(json_dir)
+    chunk_dir.parent.mkdir(parents=True, exist_ok=True)
+    json_files = list(json_dir.glob("*.json"))
 
     if not json_files:
-        raise FileNotFoundError(f"No JSON files found in {raw_json_dir}")
+        raise FileNotFoundError(f"No JSON files found in {json_dir}")
 
     all_chunks = []
     for json_path in json_files:
@@ -95,7 +95,7 @@ def process_all_papers_to_chunks(
             print(f"Failed to process {json_path.name}: {e}")
             continue
 
-    with output_chunks_path.open("w", encoding="utf-8") as f:
+    with chunk_dir.open("w", encoding="utf-8") as f:
         for doc in all_chunks:
             f.write(json.dumps(doc, ensure_ascii=False) + "\n")
 

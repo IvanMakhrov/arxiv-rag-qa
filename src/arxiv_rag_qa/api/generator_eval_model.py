@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class GeneratorEvalRequest(BaseModel):
-    test_file: str
+    test_data_dir: str
     collection_name: str
     top_k: int
     emb_model_name: str
@@ -13,4 +13,11 @@ class GeneratorEvalRequest(BaseModel):
 
 
 class GeneratorEvalResponse(BaseModel):
+    message: str
     results: dict
+    test_data_dir: str
+    collection_name: str
+    top_k: int
+    emb_model_name: str
+    gen_model_name: str
+    bertscore_model: str

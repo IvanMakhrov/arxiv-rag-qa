@@ -88,15 +88,13 @@ def generate_test_samples(
     return samples
 
 
-def generate_test_data(
-    chunks_path: str, test_data_path: str, metadata_path: str, test_data_size: int
-):
-    chunks = load_chunks(chunks_path)
+def generate_test_data(chunk_dir: str, test_data_dir: str, metadata_dir: str, test_data_size: int):
+    chunks = load_chunks(chunk_dir)
 
     if not chunks:
         raise ValueError("No chunks found. Run ingestion first.")
 
-    metadata_map = load_metadata(metadata_path)
+    metadata_map = load_metadata(metadata_dir)
     paper_to_chunks = build_paper_to_chunks(chunks)
     test_samples = generate_test_samples(
         chunks=chunks,
@@ -105,6 +103,6 @@ def generate_test_data(
         test_data_size=test_data_size,
     )
 
-    with Path.open(test_data_path, "w", encoding="utf-8") as f:
+    with Path.open(test_data_dir, "w", encoding="utf-8") as f:
         for sample in test_samples:
             f.write(json.dumps(sample, ensure_ascii=False) + "\n")

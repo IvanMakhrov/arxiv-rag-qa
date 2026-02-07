@@ -1,6 +1,6 @@
-raw_pdf_dir: data/raw/pdf
-processed_json_dir: data/raw/json
-metadata_path: data/raw/metadata/metadata.json
+pdf_dir: data/raw/pdf
+json_dir: data/raw/json
+metadata_dir: data/raw/metadata/metadata.json
 
 arxiv_category: cs.CL
 start_date: 202501010000

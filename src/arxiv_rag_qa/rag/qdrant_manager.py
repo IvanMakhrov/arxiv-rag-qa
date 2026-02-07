@@ -15,7 +15,7 @@ class QdrantManager:
         port: int = 0,
         collection_name: str = "",
         vector_size: int = 0,
-        file_path: str = "",
+        embedding_dir: str = "",
         timeout: int = 5,
         batch_size: int = 256,
     ):
@@ -23,7 +23,7 @@ class QdrantManager:
         self.port = port
         self.collection_name = collection_name
         self.vector_size = vector_size
-        self.file_path = file_path
+        self.embedding_dir = embedding_dir
         self.timeout = timeout
         self.batch_size = batch_size
 
@@ -47,9 +47,9 @@ class QdrantManager:
 
     def _read_jsonl_lines(self) -> Iterator[dict[str, Any]]:
         """Generator that yields one record at a time from the JSONL file."""
-        file_path = Path(self.file_path)
+        embedding_dir = Path(self.embedding_dir)
 
-        with file_path.open("r", encoding="utf-8") as f:
+        with embedding_dir.open("r", encoding="utf-8") as f:
             for chunk in f:
                 line = chunk.strip()
                 if line:

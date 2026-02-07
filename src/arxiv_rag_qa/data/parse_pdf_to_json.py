@@ -22,22 +22,22 @@ def load_metadata(metadata_path: str):
 
 
 def parse_pdfs_to_json(
-    raw_pdf_dir: str,
-    metadata_path: str,
-    processed_json_dir: str,
+    pdf_dir: str,
+    metadata_dir: str,
+    json_dir: str,
 ) -> int:
     """
     Convert all PDFs in raw_pdf_dir to JSON files with full text.
     Returns number of parsed papers.
     """
-    processed_json_dir = Path(processed_json_dir)
-    raw_pdf_dir = Path(raw_pdf_dir)
-    processed_json_dir.mkdir(parents=True, exist_ok=True)
-    metadata = load_metadata(metadata_path)
+    json_dir = Path(json_dir)
+    raw_pdf_dir = Path(pdf_dir)
+    json_dir.mkdir(parents=True, exist_ok=True)
+    metadata = load_metadata(metadata_dir)
     pdf_files = list(raw_pdf_dir.glob("*.pdf"))
 
     if not metadata:
-        raise FileNotFoundError(f"No metadata found in {metadata_path}")
+        raise FileNotFoundError(f"No metadata found in {metadata_dir}")
 
     if not pdf_files:
         raise FileNotFoundError(f"No PDFs found in {raw_pdf_dir}")
@@ -47,7 +47,7 @@ def parse_pdfs_to_json(
         try:
             arxiv_id = meta["arxiv_id"]
             pdf_path = meta["pdf_path"]
-            json_path = processed_json_dir / f"{arxiv_id}.json"
+            json_path = json_dir / f"{arxiv_id}.json"
 
             if json_path.exists():
                 continue
@@ -72,6 +72,6 @@ def parse_pdfs_to_json(
             print(f"Failed to parse {pdf_path.name}: {e}")
             continue
 
-        print(f"Saved {parsed_count} JSON files to {processed_json_dir}")
+        print(f"Saved {parsed_count} JSON files to {json_dir}")
 
     return parsed_count

@@ -6,7 +6,7 @@ from arxiv_rag_qa.api.download_model import DownloadRequest, DownloadResponse
 from arxiv_rag_qa.api.embeddings_model import EmbeddingsRequest, EmbeddingsResponse
 from arxiv_rag_qa.api.generator_eval_model import GeneratorEvalRequest, GeneratorEvalResponse
 from arxiv_rag_qa.api.parse_model import ParseRequest, ParseResponse
-from arxiv_rag_qa.api.process_model import ProcessRequest, ProcessResponse
+from arxiv_rag_qa.api.process_model import ChunkRequest, ChunkResponse
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest, QdrantResponse
 from arxiv_rag_qa.api.rag_model import RagRequest, RagResponse
 from arxiv_rag_qa.api.retriever_eval_model import RetrieverEvalRequest, RetrieverEvalResponse
@@ -38,41 +38,61 @@ def download_papers(request: DownloadRequest):
             start_date=request.start_date,
             target_count=request.target_count,
             results_per_request=request.results_per_request,
-            raw_pdf_dir=request.raw_pdf_dir,
-            metadata_path=request.metadata_path,
+            pdf_dir=request.pdf_dir,
+            metadata_dir=request.metadata_dir,
         )
-        return DownloadResponse(downloaded_papers_number=count, output_dir=str(request.raw_pdf_dir))
+        return DownloadResponse(
+            message="PDF downloaded successfully",
+            downloaded_papers_number=count,
+            category=request.category,
+            start_date=request.start_date,
+            target_count=request.target_count,
+            results_per_request=request.results_per_request,
+            pdf_dir=request.pdf_dir,
+            metadata_dir=request.metadata_dir,
+        )
     except Exception as e:
         logger.error(f"Parsing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/parse-pdfs", response_model=ParseResponse)
+@app.post("/parse-pdf", response_model=ParseResponse)
 def parse_pdfs(request: ParseRequest):
     """Convert PDFs to JSON with full text."""
     try:
         count = parse_pdfs_to_json(
-            raw_pdf_dir=request.raw_pdf_dir,
-            metadata_path=request.metadata_path,
-            processed_json_dir=request.processed_json_dir,
+            pdf_dir=request.pdf_dir,
+            metadata_dir=request.metadata_dir,
+            json_dir=request.json_dir,
         )
-        return ParseResponse(parsed_count=count, output_dir=request.processed_json_dir)
+        return ParseResponse(
+            message="PDF to json parsed successfully",
+            parsed_papers_number=count,
+            json_dir=request.json_dir,
+        )
     except Exception as e:
         logger.error(f"Parsing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/process-all-papers", response_model=ProcessResponse)
-def process_all_papers(request: ProcessRequest):
+@app.post("/chunking", response_model=ChunkResponse)
+def process_all_papers(request: ChunkRequest):
     """Chunk all JSON files into embeddings-ready format."""
     try:
         total_chunks = process_all_papers_to_chunks(
-            output_chunks_path=request.output_chunks_path,
-            raw_json_dir=request.raw_json_dir,
+            chunk_dir=request.chunk_dir,
+            json_dir=request.json_dir,
             chunk_size=request.chunk_size,
             chunk_overlap=request.chunk_overlap,
         )
-        return ProcessResponse(total_chunks=total_chunks, output_file=request.output_chunks_path)
+        return ChunkResponse(
+            message="Chunking success",
+            total_chunks=total_chunks,
+            chunk_dir=request.chunk_dir,
+            json_dir=request.json_dir,
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
+        )
     except Exception as e:
         logger.error(f"Processing failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -83,11 +103,17 @@ def create_embeddings(request: EmbeddingsRequest):
     """Create embeddings of chunked data texts"""
     try:
         count = generate_embeddings(
-            json_chunks=request.json_chunks,
-            json_embeddings=request.json_embeddings,
+            chunk_dir=request.chunk_dir,
+            embedding_dir=request.embedding_dir,
             model_name=request.model_name,
         )
-        return EmbeddingsResponse(embeddings_number=count, output_dir=str(request.json_embeddings))
+        return EmbeddingsResponse(
+            message="Embedding success",
+            embeddings_number=count,
+            chunk_dir=request.chunk_dir,
+            embedding_dir=request.embedding_dir,
+            model_name=request.model_name,
+        )
     except Exception as e:
         logger.error(f"Embeddings generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -102,14 +128,17 @@ def qdrant_setup(request: QdrantRequest):
             port=request.port,
             collection_name=request.collection_name,
             vector_size=request.vector_size,
-            file_path=request.file_path,
+            embedding_dir=request.embedding_dir,
             timeout=request.timeout,
             batch_size=request.batch_size,
         )
         qdrant.setup()
         return QdrantResponse(
+            message="Collection created and data added",
             collection_name=request.collection_name,
             vector_size=request.vector_size,
+            embedding_dir=request.embedding_dir,
+            batch_size=request.batch_size,
         )
     except Exception as e:
         logger.error(f"Qdrant setup failed: {e}")
@@ -121,13 +150,17 @@ def generate_test_dataset(request: TestDataRequest):
     """Generate test data"""
     try:
         generate_test_data(
-            chunks_path=request.chunks_path,
-            test_data_path=request.test_data_path,
-            metadata_path=request.metadata_path,
+            chunk_dir=request.chunk_dir,
+            test_data_dir=request.test_data_dir,
+            metadata_dir=request.metadata_dir,
             test_data_size=request.test_data_size,
         )
         return TestDataResponse(
-            test_data_path=request.test_data_path, message="Test data was generated"
+            message="Test data was generated",
+            chunk_dir=request.chunk_dir,
+            test_data_dir=request.test_data_dir,
+            metadata_dir=request.metadata_dir,
+            test_data_size=request.test_data_size,
         )
     except Exception as e:
         logger.error(f"Test data generation failed: {e}")
@@ -139,14 +172,21 @@ def eval_retriever(request: RetrieverEvalRequest):
     """Evaluate retriever"""
     try:
         count = retriever_eval(
-            test_file=request.test_file,
+            test_data_dir=request.test_data_dir,
             collection_name=request.collection_name,
             top_k=request.top_k,
             model_name=request.model_name,
             qdrant_host=request.qdrant_host,
             qdrant_port=request.qdrant_port,
         )
-        return RetrieverEvalResponse(results=count)
+        return RetrieverEvalResponse(
+            message="Retriever evaluated",
+            results=count,
+            test_data_dir=request.test_data_dir,
+            collection_name=request.collection_name,
+            top_k=request.top_k,
+            model_name=request.model_name,
+        )
     except Exception as e:
         logger.error(f"Retriever evaluation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -157,7 +197,7 @@ def eval_generator(request: GeneratorEvalRequest):
     """Evaluate generator"""
     try:
         count = generator_eval(
-            test_file=request.test_file,
+            test_data_dir=request.test_data_dir,
             collection_name=request.collection_name,
             top_k=request.top_k,
             emb_model_name=request.emb_model_name,
@@ -166,7 +206,16 @@ def eval_generator(request: GeneratorEvalRequest):
             qdrant_host=request.qdrant_host,
             qdrant_port=request.qdrant_port,
         )
-        return GeneratorEvalResponse(results=count)
+        return GeneratorEvalResponse(
+            message="Generator evaluated",
+            results=count,
+            test_data_dir=request.test_data_dir,
+            collection_name=request.collection_name,
+            top_k=request.top_k,
+            emb_model_name=request.emb_model_name,
+            gen_model_name=request.gen_model_name,
+            bertscore_model=request.bertscore_model,
+        )
     except Exception as e:
         logger.error(f"Generator evaluation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -185,7 +234,15 @@ def get_rag_response(request: RagRequest):
             qdrant_host=request.qdrant_host,
             qdrant_port=request.qdrant_port,
         )
-        return RagResponse(results=count)
+        return RagResponse(
+            message="Query was processed",
+            results=count,
+            emb_model_name=request.emb_model_name,
+            collection_name=request.collection_name,
+            top_k=request.top_k,
+            gen_model_name=request.gen_model_name,
+            query=request.query,
+        )
     except Exception as e:
         logger.error(f"Failed to get response from RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

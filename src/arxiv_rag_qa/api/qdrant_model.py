@@ -2,15 +2,18 @@ from pydantic import BaseModel
 
 
 class QdrantRequest(BaseModel):
-    host: str = ""
-    port: int = 0
-    collection_name: str = ""
-    vector_size: int = 0
-    file_path: str
+    host: str
+    port: int
+    collection_name: str
+    vector_size: int
+    embedding_dir: str
     timeout: int
     batch_size: int
 
 
 class QdrantResponse(BaseModel):
-    collection_name: str = ""
-    vector_size: int = 0
+    message: str
+    collection_name: str
+    vector_size: int
+    embedding_dir: str
+    batch_size: int

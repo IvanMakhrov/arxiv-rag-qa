@@ -2,11 +2,14 @@ from pydantic import BaseModel
 
 
 class EmbeddingsRequest(BaseModel):
-    json_chunks: str
-    json_embeddings: str
+    chunk_dir: str
+    embedding_dir: str
     model_name: str
 
 
 class EmbeddingsResponse(BaseModel):
+    message: str
     embeddings_number: int
-    output_dir: str
+    chunk_dir: str
+    embedding_dir: str
+    model_name: str

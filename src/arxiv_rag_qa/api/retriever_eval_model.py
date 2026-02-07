@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class RetrieverEvalRequest(BaseModel):
-    test_file: str
+    test_data_dir: str
     collection_name: str
     top_k: int
     model_name: str
@@ -11,4 +11,9 @@ class RetrieverEvalRequest(BaseModel):
 
 
 class RetrieverEvalResponse(BaseModel):
+    message: str
     results: dict
+    test_data_dir: str
+    collection_name: str
+    top_k: int
+    model_name: str

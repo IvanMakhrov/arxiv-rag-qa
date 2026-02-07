@@ -36,14 +36,14 @@ def hit_rate_at_k(retrieved_ids: list[int], relevant_ids: set[int], k: int) -> f
 
 
 def retriever_eval(
-    test_file: str,
+    test_data_dir: str,
     collection_name: str,
     top_k: int,
     model_name: str,
     qdrant_host: str,
     qdrant_port: int,
 ):
-    test_path = Path(test_file)
+    test_path = Path(test_data_dir)
     if not test_path.exists():
         raise FileNotFoundError(f"Test file not found: {test_path}")
 
@@ -94,10 +94,10 @@ def retriever_eval(
 
     return {
         "config": {
-            "test_file": test_file,
+            "test_file": test_data_dir,
             "collection_name": collection_name,
             "top_k": top_k,
             "embedder": model_name,
         },
-        "metrics": {"recall@k": avg_recall, "mrr@k": avg_mrr, "hit_rate@k": avg_hit},
+        "metrics": {"recall_at_k": avg_recall, "mrr_at_k": avg_mrr, "hit_rate_at_k": avg_hit},
     }
