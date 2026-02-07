@@ -38,22 +38,25 @@ docker compose up
 
 Структура файла .env:<br>
 
-```text
-AIRFLOW_UID - user ID в airflow контейнере _AIRFLOW_WWW_USER_USERNAME - логин в
-airflow _AIRFLOW_WWW_USER_PASSWORD - пароль в airflow AIRFLOW__CORE__FERNET_KEY
-- ключ для кодирования паролей
+- AIRFLOW_UID - user ID в airflow контейнере
+- \_AIRFLOW_WWW_USER_USERNAME - логин в airflow
+- \_AIRFLOW_WWW_USER_PASSWORD - пароль в airflow
+- AIRFLOW**CORE**FERNET_KEY - ключ для кодирования паролей
 
-AWS_ACCESS_KEY_ID - логин в minio AWS_SECRET_ACCESS_KEY - пароль в minio
+- WS_ACCESS_KEY_ID - логин в minio
+- AWS_SECRET_ACCESS_KEY - пароль в minio
 
-POSTGRES_USER - пользователь в postgres POSTGRES_PASSWORD - пароль в postgres
-POSTGRES_DB - имя БД в postgres
-```
+- POSTGRES_USER - пользователь в postgres
+- POSTGRES_PASSWORD - пароль в postgres
+- POSTGRES_DB - имя БД в postgres
 
 Для получения FERNET_KEY:<br>
 
 ```python
 python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
+
+## 3. Настройка соединения в AirFlow
 
 В AirFlow UI заходим в Admin - Connections:<br>
 
