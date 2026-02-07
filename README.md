@@ -38,7 +38,7 @@ docker compose up
 
 Структура файла .env:<br>
 
-```yaml
+```text
 AIRFLOW_UID - user ID в airflow контейнере _AIRFLOW_WWW_USER_USERNAME - логин в
 airflow _AIRFLOW_WWW_USER_PASSWORD - пароль в airflow AIRFLOW__CORE__FERNET_KEY
 - ключ для кодирования паролей
