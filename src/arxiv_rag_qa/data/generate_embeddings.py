@@ -1,36 +1,52 @@
 import json
-from pathlib import Path
 
+import boto3
 from sentence_transformers import SentenceTransformer
 
 
-def generate_embeddings(chunk_dir: str, embedding_dir: str, model_name: str):
-    """Генерирует эмбеддинги для каждого чанка и сохраняет в новый JSONL"""
-    chunk_dir = Path(chunk_dir)
-    embedding_dir = Path(embedding_dir)
+def get_minio_client():
+    return boto3.client("s3")
 
-    model = SentenceTransformer(model_name)
+
+def generate_embeddings(bucket_name: str, chunk_dir: str, embedding_dir: str, model_name: str):
+    """Генерирует эмбеддинги для каждого чанка и сохраняет в новый JSONL"""
+
+    s3_client = get_minio_client()
+
+    try:
+        response = s3_client.get_object(Bucket=bucket_name, Key=chunk_dir)
+        chunk_data = response["Body"].read().decode("utf-8")
+    except Exception as e:
+        raise Exception(f"Chunk file not found in s3://{bucket_name}/{chunk_dir}: {e}") from e
 
     texts = []
     records = []
-    with chunk_dir.open("r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                record = json.loads(line.strip())
-                records.append(record)
-                texts.append(record["text"])
+    for line in chunk_data.strip().split("\n"):
+        if line.strip():
+            record = json.loads(line)
+            records.append(record)
+            texts.append(record["text"])
 
     if not texts:
         raise ValueError("No chunks found for embedding!")
 
     print(f"Generating embeddings for {len(texts)} chunks using {model_name}")
+    model = SentenceTransformer(model_name)
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
 
-    with embedding_dir.open("w", encoding="utf-8") as f:
-        for record, emb in zip(records, embeddings, strict=False):
-            record["embedding"] = emb.tolist()
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    jsonl_lines = []
+    for record, emb in zip(records, embeddings, strict=False):
+        record["embedding"] = emb.tolist()
+        jsonl_lines.append(json.dumps(record, ensure_ascii=False))
 
-    print(f"Saved embeddings to {embedding_dir}")
+    jsonl_content = "\n".join(jsonl_lines)
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=embedding_dir,
+        Body=jsonl_content.encode("utf-8"),
+        ContentType="application/jsonl",
+    )
+
+    print(f"Saved embeddings to s3://{bucket_name}/{embedding_dir}")
 
     return len(embeddings)

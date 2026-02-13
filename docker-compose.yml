@@ -17,10 +17,6 @@ x-airflow-common: &airflow-common
     PYTHONPATH: "/opt/airflow/src:${PYTHONPATH:-}"
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-    - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
-    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
     - ${AIRFLOW_PROJ_DIR:-.}/src:/opt/airflow/src
     - ${AIRFLOW_PROJ_DIR:-.}:/opt/airflow/project
     - ${AIRFLOW_PROJ_DIR:-.}/conf:/opt/airflow/conf
@@ -92,7 +88,7 @@ services:
     volumes:
       - mlflow-data:/mlflow
 
-  chunking-service:
+  rag-service:
     build:
       context: .
       dockerfile: Dockerfile
@@ -102,6 +98,10 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}:/app
     environment:
       - PYTHONPATH=/app/src
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_ENDPOINT_URL=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
     restart: unless-stopped
 
   redis:
@@ -170,8 +170,6 @@ services:
         if [[ -z "${AIRFLOW_UID}" ]]; then
           echo -e "\033[1;33mWARNING: AIRFLOW_UID not set!\e[0m"
         fi
-        mkdir -p /sources/logs /sources/dags /sources/plugins
-        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
         exec /entrypoint airflow version
     environment:
       <<: *airflow-common-env

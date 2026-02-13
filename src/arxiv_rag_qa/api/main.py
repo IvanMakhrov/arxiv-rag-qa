@@ -2,15 +2,26 @@ import logging
 
 from fastapi import FastAPI, HTTPException
 
-from arxiv_rag_qa.api.download_model import DownloadRequest, DownloadResponse
-from arxiv_rag_qa.api.embeddings_model import EmbeddingsRequest, EmbeddingsResponse
-from arxiv_rag_qa.api.generator_eval_model import GeneratorEvalRequest, GeneratorEvalResponse
-from arxiv_rag_qa.api.parse_model import ParseRequest, ParseResponse
-from arxiv_rag_qa.api.process_model import ChunkRequest, ChunkResponse
+from arxiv_rag_qa.api.data_model import (
+    ChunkRequest,
+    ChunkResponse,
+    DownloadRequest,
+    DownloadResponse,
+    EmbeddingsRequest,
+    EmbeddingsResponse,
+    ParseRequest,
+    ParseResponse,
+    TestDataRequest,
+    TestDataResponse,
+)
+from arxiv_rag_qa.api.eval_model import (
+    GeneratorEvalRequest,
+    GeneratorEvalResponse,
+    RetrieverEvalRequest,
+    RetrieverEvalResponse,
+)
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest, QdrantResponse
 from arxiv_rag_qa.api.rag_model import RagRequest, RagResponse
-from arxiv_rag_qa.api.retriever_eval_model import RetrieverEvalRequest, RetrieverEvalResponse
-from arxiv_rag_qa.api.test_data_model import TestDataRequest, TestDataResponse
 from arxiv_rag_qa.data.chunking import process_all_papers_to_chunks
 from arxiv_rag_qa.data.download_data import fetch_arxiv_pdfs
 from arxiv_rag_qa.data.generate_embeddings import generate_embeddings
@@ -38,6 +49,7 @@ def download_papers(request: DownloadRequest):
             start_date=request.start_date,
             target_count=request.target_count,
             results_per_request=request.results_per_request,
+            bucket_name=request.bucket_name,
             pdf_dir=request.pdf_dir,
             metadata_dir=request.metadata_dir,
         )
@@ -48,6 +60,7 @@ def download_papers(request: DownloadRequest):
             start_date=request.start_date,
             target_count=request.target_count,
             results_per_request=request.results_per_request,
+            bucket_name=request.bucket_name,
             pdf_dir=request.pdf_dir,
             metadata_dir=request.metadata_dir,
         )
@@ -61,13 +74,15 @@ def parse_pdfs(request: ParseRequest):
     """Convert PDFs to JSON with full text."""
     try:
         count = parse_pdfs_to_json(
-            pdf_dir=request.pdf_dir,
+            bucket_name=request.bucket_name,
             metadata_dir=request.metadata_dir,
             json_dir=request.json_dir,
         )
         return ParseResponse(
             message="PDF to json parsed successfully",
             parsed_papers_number=count,
+            bucket_name=request.bucket_name,
+            metadata_dir=request.metadata_dir,
             json_dir=request.json_dir,
         )
     except Exception as e:
@@ -80,6 +95,7 @@ def process_all_papers(request: ChunkRequest):
     """Chunk all JSON files into embeddings-ready format."""
     try:
         total_chunks = process_all_papers_to_chunks(
+            bucket_name=request.bucket_name,
             chunk_dir=request.chunk_dir,
             json_dir=request.json_dir,
             chunk_size=request.chunk_size,
@@ -87,6 +103,7 @@ def process_all_papers(request: ChunkRequest):
         )
         return ChunkResponse(
             message="Chunking success",
+            bucket_name=request.bucket_name,
             total_chunks=total_chunks,
             chunk_dir=request.chunk_dir,
             json_dir=request.json_dir,
@@ -103,12 +120,14 @@ def create_embeddings(request: EmbeddingsRequest):
     """Create embeddings of chunked data texts"""
     try:
         count = generate_embeddings(
+            bucket_name=request.bucket_name,
             chunk_dir=request.chunk_dir,
             embedding_dir=request.embedding_dir,
             model_name=request.model_name,
         )
         return EmbeddingsResponse(
             message="Embedding success",
+            bucket_name=request.bucket_name,
             embeddings_number=count,
             chunk_dir=request.chunk_dir,
             embedding_dir=request.embedding_dir,
@@ -128,15 +147,18 @@ def qdrant_setup(request: QdrantRequest):
             port=request.port,
             collection_name=request.collection_name,
             vector_size=request.vector_size,
+            bucket_name=request.bucket_name,
             embedding_dir=request.embedding_dir,
             timeout=request.timeout,
             batch_size=request.batch_size,
         )
-        qdrant.setup()
+        count = qdrant.setup()
         return QdrantResponse(
             message="Collection created and data added",
+            points_number=count,
             collection_name=request.collection_name,
             vector_size=request.vector_size,
+            bucket_name=request.bucket_name,
             embedding_dir=request.embedding_dir,
             batch_size=request.batch_size,
         )
@@ -150,6 +172,7 @@ def generate_test_dataset(request: TestDataRequest):
     """Generate test data"""
     try:
         generate_test_data(
+            bucket_name=request.bucket_name,
             chunk_dir=request.chunk_dir,
             test_data_dir=request.test_data_dir,
             metadata_dir=request.metadata_dir,
@@ -157,6 +180,7 @@ def generate_test_dataset(request: TestDataRequest):
         )
         return TestDataResponse(
             message="Test data was generated",
+            bucket_name=request.bucket_name,
             chunk_dir=request.chunk_dir,
             test_data_dir=request.test_data_dir,
             metadata_dir=request.metadata_dir,
@@ -172,6 +196,7 @@ def eval_retriever(request: RetrieverEvalRequest):
     """Evaluate retriever"""
     try:
         count = retriever_eval(
+            bucket_name=request.bucket_name,
             test_data_dir=request.test_data_dir,
             collection_name=request.collection_name,
             top_k=request.top_k,
@@ -182,6 +207,7 @@ def eval_retriever(request: RetrieverEvalRequest):
         return RetrieverEvalResponse(
             message="Retriever evaluated",
             results=count,
+            bucket_name=request.bucket_name,
             test_data_dir=request.test_data_dir,
             collection_name=request.collection_name,
             top_k=request.top_k,
@@ -197,6 +223,7 @@ def eval_generator(request: GeneratorEvalRequest):
     """Evaluate generator"""
     try:
         count = generator_eval(
+            bucket_name=request.bucket_name,
             test_data_dir=request.test_data_dir,
             collection_name=request.collection_name,
             top_k=request.top_k,
@@ -209,6 +236,7 @@ def eval_generator(request: GeneratorEvalRequest):
         return GeneratorEvalResponse(
             message="Generator evaluated",
             results=count,
+            bucket_name=request.bucket_name,
             test_data_dir=request.test_data_dir,
             collection_name=request.collection_name,
             top_k=request.top_k,

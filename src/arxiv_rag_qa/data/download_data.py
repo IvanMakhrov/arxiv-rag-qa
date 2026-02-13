@@ -1,19 +1,31 @@
 import json
 import time
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
+import boto3
 import requests
 
 
-def save_metadata(data: list, metadata_path: str):
-    metadata_path = Path(metadata_path)
-    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+def get_minio_client():
+    return boto3.client("s3")
 
-    with Path.open(str(metadata_path), "w") as f:
-        json.dump(data, f, indent=2)
-    print(f"Data saved to {metadata_path}")
+
+def save_metadata_to_minio(data: list, bucket_name: str, metadata_key: str, s3_client: Any):
+    """Save metadata JSON to MinIO as a single object."""
+    json_str = json.dumps(data, indent=2)
+    s3_client.put_object(
+        Bucket=bucket_name, Key=metadata_key, Body=json_str, ContentType="application/json"
+    )
+    print(f"Metadata saved to s3://{bucket_name}/{metadata_key}")
+
+
+def create_bucket(bucket_name: str, s3_client: Any):
+    try:
+        s3_client.head_bucket(Bucket=bucket_name)
+    except Exception:
+        s3_client.create_bucket(Bucket=bucket_name)
 
 
 def fetch_arxiv_pdfs(
@@ -21,6 +33,7 @@ def fetch_arxiv_pdfs(
     start_date: str = "",
     target_count: int = 0,
     results_per_request: int = 0,
+    bucket_name: str = "",
     pdf_dir: str = "",
     metadata_dir: str = "",
 ) -> list[dict]:
@@ -28,8 +41,9 @@ def fetch_arxiv_pdfs(
     Download arXiv papers as PDFs and return metadata list.
     Does NOT parse to JSON.
     """
-    pdf_dir = Path(pdf_dir)
-    pdf_dir.mkdir(parents=True, exist_ok=True)
+
+    s3_client = get_minio_client()
+    create_bucket(bucket_name, s3_client)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -86,25 +100,34 @@ def fetch_arxiv_pdfs(
                     author.find("{http://www.w3.org/2005/Atom}name").text
                     for author in entry.findall("{http://www.w3.org/2005/Atom}author")
                 ]
-                pdf_path = pdf_dir / f"{paper_id}.pdf"
+                pdf_path = f"{pdf_dir}/{paper_id}.pdf"
 
-                if paper_id not in downloaded:
-                    if not pdf_path.exists():
-                        pdf_url = f"https://arxiv.org/pdf/{paper_id}.pdf"
-                        pdf_resp = requests.get(pdf_url, headers=headers, timeout=10)
-                        pdf_resp.raise_for_status()
-                        with pdf_path.open("wb") as f:
-                            f.write(pdf_resp.content)
-                        print(f"Downloaded: {paper_id}")
-                    else:
-                        print(f"Already exists: {paper_id}")
+                try:
+                    s3_client.head_object(Bucket=bucket_name, Key=pdf_path)
+                    print(f"Already exists in MinIO: {paper_id}")
+                    exists_in_minio = True
+                except Exception:
+                    exists_in_minio = False
+
+                if paper_id not in downloaded and not exists_in_minio:
+                    pdf_url = f"https://arxiv.org/pdf/{paper_id}.pdf"
+                    pdf_resp = requests.get(pdf_url, headers=headers, timeout=10)
+                    pdf_resp.raise_for_status()
+
+                    s3_client.put_object(
+                        Bucket=bucket_name,
+                        Key=pdf_path,
+                        Body=pdf_resp.content,
+                        ContentType="application/pdf",
+                    )
+                    print(f"Uploaded to MinIO: {paper_id}")
 
                     downloaded[paper_id] = {
                         "arxiv_id": paper_id,
                         "title": title,
                         "abstract": summary,
                         "authors": authors,
-                        "pdf_path": str(pdf_path),
+                        "pdf_path": pdf_path,
                     }
                     time.sleep(1)
             except Exception as e:
@@ -116,6 +139,6 @@ def fetch_arxiv_pdfs(
             break
 
         metadata_list = [downloaded[pid] for pid in downloaded]
-        save_metadata(metadata_list, metadata_dir)
+        save_metadata_to_minio(metadata_list, bucket_name, metadata_dir, s3_client)
 
     return len(list(downloaded.values()))

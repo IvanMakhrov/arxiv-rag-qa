@@ -1,6 +1,11 @@
 import json
 import re
-from pathlib import Path
+
+import boto3
+
+
+def get_minio_client():
+    return boto3.client("s3")
 
 
 def process_text(text):
@@ -44,6 +49,7 @@ def split_text_recursive(text: str, chunk_size: int = 512, chunk_overlap: int = 
 
 
 def process_all_papers_to_chunks(
+    bucket_name: str,
     json_dir: str,
     chunk_dir: str,
     chunk_size: int = 512,
@@ -53,19 +59,26 @@ def process_all_papers_to_chunks(
     Process all JSON files into chunks and save as JSONL.
     Returns total number of chunks.
     """
-    chunk_dir = Path(chunk_dir)
-    json_dir = Path(json_dir)
-    chunk_dir.parent.mkdir(parents=True, exist_ok=True)
-    json_files = list(json_dir.glob("*.json"))
+    s3_client = get_minio_client()
+
+    paginator = s3_client.get_paginator("list_objects_v2")
+    pages = paginator.paginate(Bucket=bucket_name, Prefix=json_dir.rstrip("/") + "/")
+
+    json_files = []
+    for page in pages:
+        if "Contents" in page:
+            json_files.extend(
+                [obj["Key"] for obj in page["Contents"] if obj["Key"].endswith(".json")]
+            )
 
     if not json_files:
-        raise FileNotFoundError(f"No JSON files found in {json_dir}")
+        raise FileNotFoundError(f"No JSON files found in s3://{bucket_name}/{json_dir}")
 
     all_chunks = []
     for json_path in json_files:
         try:
-            with json_path.open("r", encoding="utf-8") as f:
-                paper = json.load(f)
+            response = s3_client.get_object(Bucket=bucket_name, Key=json_path)
+            paper = json.loads(response["Body"].read().decode("utf-8"))
 
             full_text = paper.get("full_text", "").strip()
             if not full_text:
@@ -92,11 +105,17 @@ def process_all_papers_to_chunks(
                     )
 
         except Exception as e:
-            print(f"Failed to process {json_path.name}: {e}")
+            print(f"Failed to process {json_path}: {e}")
             continue
 
-    with chunk_dir.open("w", encoding="utf-8") as f:
-        for doc in all_chunks:
-            f.write(json.dumps(doc, ensure_ascii=False) + "\n")
+    jsonl_content = "\n".join(json.dumps(chunk, ensure_ascii=False) for chunk in all_chunks)
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=chunk_dir,
+        Body=jsonl_content.encode("utf-8"),
+        ContentType="application/jsonl",
+    )
+
+    print(f"Saved {len(all_chunks)} chunks to s3://{bucket_name}/{chunk_dir}")
 
     return len(all_chunks)

@@ -8,5 +8,6 @@ defaults:
   - retriever: retriever
   - test_data: test_data
   - qdrant: qdrant
+  - minio: minio
   - eval: eval
   - _self_

@@ -1,6 +1,7 @@
 import json
-from pathlib import Path
+from typing import Any
 
+import boto3
 import sacrebleu
 from bert_score import score as bert_score
 from rouge_score import rouge_scorer
@@ -11,9 +12,21 @@ from arxiv_rag_qa.rag.generator import QwenGenerator
 from arxiv_rag_qa.rag.retriever import DenseRetriever
 
 
-def load_test_set(path: str) -> list:
-    with Path.open(path) as f:
-        return [json.loads(line) for line in f if line.strip()]
+def get_minio_client():
+    return boto3.client("s3")
+
+
+def load_test_set_from_minio(bucket: str, test_data_key: str, s3_client: Any) -> list:
+    """Load test samples from MinIO JSONL file."""
+    try:
+        response = s3_client.get_object(Bucket=bucket, Key=test_data_key)
+        samples = []
+        for line in response["Body"].iter_lines():
+            if line:
+                samples.append(json.loads(line.decode("utf-8")))
+        return samples
+    except Exception as e:
+        raise FileNotFoundError(f"Test file not found in s3://{bucket}/{test_data_key}: {e}") from e
 
 
 def compute_rouge(predictions: list[str], references: list[str]) -> dict:
@@ -60,6 +73,7 @@ def compute_faithfulness(answers: list[str], contexts: list[str]) -> float:
 
 
 def generator_eval(
+    bucket_name: str,
     test_data_dir: str,
     collection_name: str,
     top_k: int,
@@ -69,7 +83,8 @@ def generator_eval(
     qdrant_host: str,
     qdrant_port: int,
 ):
-    test_samples = load_test_set(test_data_dir)
+    s3_client = get_minio_client()
+    test_samples = load_test_set_from_minio(bucket_name, test_data_dir, s3_client)
 
     embedder = SentenceTransformer(emb_model_name)
 

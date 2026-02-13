@@ -1,12 +1,16 @@
 import json
-from pathlib import Path
+from typing import Any
 
+import boto3
 import fitz
 
 
-def extract_full_text_with_pymupdf(pdf_path: str) -> str:
-    """Извлекает весь текст из PDF, сохраняя порядок чтения."""
-    doc = fitz.open(pdf_path)
+def get_minio_client():
+    return boto3.client("s3")
+
+
+def extract_full_text_with_pymupdf(pdf_bytes: bytes) -> str:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     full_text = ""
     for page in doc:
         full_text += page.get_text("text")
@@ -14,15 +18,16 @@ def extract_full_text_with_pymupdf(pdf_path: str) -> str:
     return full_text
 
 
-def load_metadata(metadata_path: str):
-    with Path.open(metadata_path, "r", encoding="utf-8") as f:
-        metadata = json.load(f)
-    print(f"Metadata loaded from {metadata_path}")
+def load_metadata_from_minio(bucket: str, metadata_key: str, s3_client: Any):
+    """Load metadata JSON from MinIO."""
+    response = s3_client.get_object(Bucket=bucket, Key=metadata_key)
+    metadata = json.loads(response["Body"].read().decode("utf-8"))
+    print(f"Metadata loaded from s3://{bucket}/{metadata_key}")
     return metadata
 
 
 def parse_pdfs_to_json(
-    pdf_dir: str,
+    bucket_name: str,
     metadata_dir: str,
     json_dir: str,
 ) -> int:
@@ -30,29 +35,29 @@ def parse_pdfs_to_json(
     Convert all PDFs in raw_pdf_dir to JSON files with full text.
     Returns number of parsed papers.
     """
-    json_dir = Path(json_dir)
-    raw_pdf_dir = Path(pdf_dir)
-    json_dir.mkdir(parents=True, exist_ok=True)
-    metadata = load_metadata(metadata_dir)
-    pdf_files = list(raw_pdf_dir.glob("*.pdf"))
+    s3_client = get_minio_client()
+    metadata = load_metadata_from_minio(bucket_name, metadata_dir, s3_client)
 
     if not metadata:
-        raise FileNotFoundError(f"No metadata found in {metadata_dir}")
-
-    if not pdf_files:
-        raise FileNotFoundError(f"No PDFs found in {raw_pdf_dir}")
+        raise ValueError(f"No metadata found in s3://{bucket_name}/{metadata_dir}")
 
     parsed_count = 0
     for meta in metadata:
         try:
             arxiv_id = meta["arxiv_id"]
             pdf_path = meta["pdf_path"]
-            json_path = json_dir / f"{arxiv_id}.json"
+            json_path = f"{json_dir}/{arxiv_id}.json"
 
-            if json_path.exists():
+            try:
+                s3_client.head_object(Bucket=bucket_name, Key=str(json_path))
                 continue
+            except Exception:
+                pass
 
-            full_text = extract_full_text_with_pymupdf(str(pdf_path))
+            pdf_obj = s3_client.get_object(Bucket=bucket_name, Key=pdf_path)
+            pdf_bytes = pdf_obj["Body"].read()
+
+            full_text = extract_full_text_with_pymupdf(pdf_bytes)
 
             doc_json = {
                 "arxiv_id": arxiv_id,
@@ -63,15 +68,16 @@ def parse_pdfs_to_json(
                 "full_text": full_text.strip(),
             }
 
-            with json_path.open("w", encoding="utf-8") as f:
-                json.dump(doc_json, f, ensure_ascii=False, indent=2)
-
+            json_str = json.dumps(doc_json, ensure_ascii=False, indent=2)
+            s3_client.put_object(
+                Bucket=bucket_name, Key=json_path, Body=json_str, ContentType="application/json"
+            )
             parsed_count += 1
 
         except Exception as e:
-            print(f"Failed to parse {pdf_path.name}: {e}")
+            print(f"Failed to parse {arxiv_id}: {e}")
             continue
 
-        print(f"Saved {parsed_count} JSON files to {json_dir}")
+        print(f"Saved {parsed_count} JSON files to s3://{bucket_name}/{json_dir}")
 
     return parsed_count

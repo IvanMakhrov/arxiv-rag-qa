@@ -62,7 +62,7 @@ docker compose up
 
 - Connection_id - rag_service. http_conn_id в HTTPOperator
 - Connection Type - HTTP
-- Host - http://chunking-service:8000. Имя сервиса и порт в docker-compose.yml
+- Host - http://rag-service:8000. Имя сервиса и порт в docker-compose.yml
 
 ## Стэк
 

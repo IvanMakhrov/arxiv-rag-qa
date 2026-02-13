@@ -1,23 +1,42 @@
 import json
-from pathlib import Path
 from typing import Any
 
-
-def load_chunks(file_path: Path) -> list[dict[str, Any]]:
-    """Load chunked documents with metadata."""
-    chunks = []
-    with Path.open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                chunks.append(json.loads(line))
-    return chunks
+import boto3
 
 
-def load_metadata(metadata_path: Path) -> dict[str, dict[str, Any]]:
-    """Load metadata.json and return {arxiv_id: paper_data} mapping."""
-    with Path.open(metadata_path, "r", encoding="utf-8") as f:
-        papers = json.load(f)
-    return {paper["arxiv_id"]: paper for paper in papers}
+def get_minio_client():
+    return boto3.client("s3")
+
+
+def load_chunks_from_minio(
+    bucket_name: str, chunk_key: str, s3_client: Any
+) -> list[dict[str, Any]]:
+    """Load chunked documents with metadata from MinIO."""
+    try:
+        response = s3_client.get_object(Bucket=bucket_name, Key=chunk_key)
+        chunks = []
+        for line in response["Body"].iter_lines():
+            if line:
+                chunks.append(json.loads(line.decode("utf-8")))
+        return chunks
+    except Exception as e:
+        raise FileNotFoundError(
+            f"Chunk file not found in s3://{bucket_name}/{chunk_key}: {e}"
+        ) from e
+
+
+def load_metadata_from_minio(
+    bucket_name: str, metadata_key: str, s3_client: Any
+) -> dict[str, dict[str, Any]]:
+    """Load metadata.json from MinIO and return {arxiv_id: paper_data} mapping."""
+    try:
+        response = s3_client.get_object(Bucket=bucket_name, Key=metadata_key)
+        papers = json.loads(response["Body"].read().decode("utf-8"))
+        return {paper["arxiv_id"]: paper for paper in papers}
+    except Exception as e:
+        raise FileNotFoundError(
+            f"Metadata file not found in s3://{bucket_name}/{metadata_key}: {e}"
+        ) from e
 
 
 def build_paper_to_chunks(chunks: list[dict[str, Any]]) -> dict[str, list[int]]:
@@ -88,13 +107,16 @@ def generate_test_samples(
     return samples
 
 
-def generate_test_data(chunk_dir: str, test_data_dir: str, metadata_dir: str, test_data_size: int):
-    chunks = load_chunks(chunk_dir)
+def generate_test_data(
+    bucket_name: str, chunk_dir: str, test_data_dir: str, metadata_dir: str, test_data_size: int
+):
+    s3_client = get_minio_client()
+    chunks = load_chunks_from_minio(bucket_name, chunk_dir, s3_client)
 
     if not chunks:
         raise ValueError("No chunks found. Run ingestion first.")
 
-    metadata_map = load_metadata(metadata_dir)
+    metadata_map = load_metadata_from_minio(bucket_name, metadata_dir, s3_client)
     paper_to_chunks = build_paper_to_chunks(chunks)
     test_samples = generate_test_samples(
         chunks=chunks,
@@ -103,6 +125,14 @@ def generate_test_data(chunk_dir: str, test_data_dir: str, metadata_dir: str, te
         test_data_size=test_data_size,
     )
 
-    with Path.open(test_data_dir, "w", encoding="utf-8") as f:
-        for sample in test_samples:
-            f.write(json.dumps(sample, ensure_ascii=False) + "\n")
+    jsonl_content = "\n".join(json.dumps(sample, ensure_ascii=False) for sample in test_samples)
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=test_data_dir,
+        Body=jsonl_content.encode("utf-8"),
+        ContentType="application/jsonl",
+    )
+
+    print(f"Saved {len(test_samples)} test samples to s3://{bucket_name}/{test_data_dir}")
+
+    return len(test_samples)

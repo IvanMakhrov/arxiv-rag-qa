@@ -3,4 +3,4 @@ port: 6333
 collection_name: arxiv_rag
 vector_size: 384
 timeout: 60
-batch_size: 1024
+batch_size: 8192

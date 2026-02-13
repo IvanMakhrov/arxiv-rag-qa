@@ -59,6 +59,7 @@ with DAG(
                 "start_date": str(cfg.download.start_date),
                 "target_count": cfg.download.target_paper_count,
                 "results_per_request": cfg.download.results_per_request,
+                "bucket_name": cfg.minio.bucket_name,
                 "pdf_dir": cfg.download.pdf_dir,
                 "metadata_dir": cfg.download.metadata_dir,
             }
@@ -87,7 +88,7 @@ with DAG(
         do_xcom_push=True,
         data=json.dumps(
             {
-                "pdf_dir": cfg.download.pdf_dir,
+                "bucket_name": cfg.minio.bucket_name,
                 "metadata_dir": cfg.download.metadata_dir,
                 "json_dir": cfg.download.json_dir,
             }
@@ -116,6 +117,7 @@ with DAG(
         do_xcom_push=True,
         data=json.dumps(
             {
+                "bucket_name": cfg.minio.bucket_name,
                 "chunk_dir": cfg.chunking.chunk_dir,
                 "json_dir": cfg.download.json_dir,
                 "chunk_size": cfg.chunking.chunk_size,
@@ -146,6 +148,7 @@ with DAG(
         do_xcom_push=True,
         data=json.dumps(
             {
+                "bucket_name": cfg.minio.bucket_name,
                 "chunk_dir": cfg.chunking.chunk_dir,
                 "embedding_dir": cfg.embeddings.embedding_dir,
                 "model_name": cfg.embeddings.model_name,
@@ -175,6 +178,7 @@ with DAG(
         do_xcom_push=True,
         data=json.dumps(
             {
+                "bucket_name": cfg.minio.bucket_name,
                 "chunk_dir": cfg.chunking.chunk_dir,
                 "test_data_dir": cfg.test_data.test_data_dir,
                 "metadata_dir": cfg.download.metadata_dir,

@@ -55,6 +55,7 @@ with DAG(
         do_xcom_push=True,
         data=json.dumps(
             {
+                "bucket_name": cfg.minio.bucket_name,
                 "test_data_dir": cfg.eval.test_data_dir,
                 "collection_name": cfg.qdrant.collection_name,
                 "top_k": cfg.retriever.top_k,
@@ -87,6 +88,7 @@ with DAG(
         do_xcom_push=True,
         data=json.dumps(
             {
+                "bucket_name": cfg.minio.bucket_name,
                 "test_data_dir": cfg.eval.test_data_dir,
                 "collection_name": cfg.qdrant.collection_name,
                 "top_k": cfg.retriever.top_k,

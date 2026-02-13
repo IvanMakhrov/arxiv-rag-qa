@@ -30,6 +30,7 @@ api = [
   "sacrebleu>=2.6.0",
   "bert-score>=0.3.13",
   "rouge-score>=0.1.2",
+  "boto3>=1.42.19",
 ]
 
 airflow = [

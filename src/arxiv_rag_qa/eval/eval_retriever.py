@@ -1,18 +1,29 @@
 import json
-from pathlib import Path
+from typing import Any
 
+import boto3
 from sentence_transformers import SentenceTransformer
 
 from arxiv_rag_qa.rag.retriever import DenseRetriever
 
 
-def load_test_set(path: str) -> list:
-    samples = []
-    with Path.open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                samples.append(json.loads(line))
-    return samples
+def get_minio_client():
+    return boto3.client("s3")
+
+
+def load_test_set_from_minio(bucket_name: str, test_data_key: str, s3_client: Any) -> list:
+    """Load test samples from MinIO JSONL file."""
+    try:
+        response = s3_client.get_object(Bucket=bucket_name, Key=test_data_key)
+        samples = []
+        for line in response["Body"].iter_lines():
+            if line:
+                samples.append(json.loads(line.decode("utf-8")))
+        return samples
+    except Exception as e:
+        raise FileNotFoundError(
+            f"Test file not found in s3://{bucket_name}/{test_data_key}: {e}"
+        ) from e
 
 
 def recall_at_k(retrieved_ids: list[int], relevant_ids: set[int], k: int) -> float:
@@ -36,6 +47,7 @@ def hit_rate_at_k(retrieved_ids: list[int], relevant_ids: set[int], k: int) -> f
 
 
 def retriever_eval(
+    bucket_name: str,
     test_data_dir: str,
     collection_name: str,
     top_k: int,
@@ -43,11 +55,8 @@ def retriever_eval(
     qdrant_host: str,
     qdrant_port: int,
 ):
-    test_path = Path(test_data_dir)
-    if not test_path.exists():
-        raise FileNotFoundError(f"Test file not found: {test_path}")
-
-    test_samples = load_test_set(str(test_path))
+    s3_client = get_minio_client()
+    test_samples = load_test_set_from_minio(bucket_name, test_data_dir, s3_client)
 
     embedder = SentenceTransformer(model_name)
 

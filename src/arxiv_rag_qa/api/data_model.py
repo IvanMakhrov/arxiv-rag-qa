@@ -1,0 +1,88 @@
+from pydantic import BaseModel
+
+
+class DownloadRequest(BaseModel):
+    category: str
+    start_date: str
+    results_per_request: int
+    bucket_name: str
+    target_count: int
+    pdf_dir: str
+    metadata_dir: str
+
+
+class DownloadResponse(BaseModel):
+    message: str
+    downloaded_papers_number: int
+    category: str
+    start_date: str
+    results_per_request: int
+    bucket_name: str
+    target_count: int
+    pdf_dir: str
+    metadata_dir: str
+
+
+class ParseRequest(BaseModel):
+    bucket_name: str
+    metadata_dir: str
+    json_dir: str
+
+
+class ParseResponse(BaseModel):
+    message: str
+    parsed_papers_number: int
+    bucket_name: str
+    metadata_dir: str
+    json_dir: str
+
+
+class ChunkRequest(BaseModel):
+    bucket_name: str
+    chunk_dir: str
+    json_dir: str
+    chunk_size: int
+    chunk_overlap: int
+
+
+class ChunkResponse(BaseModel):
+    message: str
+    bucket_name: str
+    total_chunks: int
+    chunk_dir: str
+    json_dir: str
+    chunk_size: int
+    chunk_overlap: int
+
+
+class EmbeddingsRequest(BaseModel):
+    bucket_name: str
+    chunk_dir: str
+    embedding_dir: str
+    model_name: str
+
+
+class EmbeddingsResponse(BaseModel):
+    message: str
+    bucket_name: str
+    embeddings_number: int
+    chunk_dir: str
+    embedding_dir: str
+    model_name: str
+
+
+class TestDataRequest(BaseModel):
+    bucket_name: str
+    chunk_dir: str
+    test_data_dir: str
+    metadata_dir: str
+    test_data_size: int
+
+
+class TestDataResponse(BaseModel):
+    message: str
+    bucket_name: str
+    chunk_dir: str
+    test_data_dir: str
+    metadata_dir: str
+    test_data_size: int

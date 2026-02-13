@@ -59,6 +59,7 @@ with DAG(
                 "port": cfg.qdrant.port,
                 "collection_name": cfg.qdrant.collection_name,
                 "vector_size": cfg.qdrant.vector_size,
+                "bucket_name": cfg.minio.bucket_name,
                 "embedding_dir": cfg.embeddings.embedding_dir,
                 "timeout": cfg.qdrant.timeout,
                 "batch_size": cfg.qdrant.batch_size,
