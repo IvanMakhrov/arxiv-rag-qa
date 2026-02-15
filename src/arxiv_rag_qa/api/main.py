@@ -1,175 +1,226 @@
 import logging
+import uuid
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
 
 from arxiv_rag_qa.api.data_model import (
     ChunkRequest,
-    ChunkResponse,
     DownloadRequest,
-    DownloadResponse,
     EmbeddingsRequest,
-    EmbeddingsResponse,
     ParseRequest,
-    ParseResponse,
+    TaskListResponse,
+    TaskStatusResponse,
     TestDataRequest,
     TestDataResponse,
 )
 from arxiv_rag_qa.api.eval_model import (
     GeneratorEvalRequest,
-    GeneratorEvalResponse,
     RetrieverEvalRequest,
-    RetrieverEvalResponse,
 )
-from arxiv_rag_qa.api.qdrant_model import QdrantRequest, QdrantResponse
-from arxiv_rag_qa.api.rag_model import RagRequest, RagResponse
-from arxiv_rag_qa.data.chunking import process_all_papers_to_chunks
-from arxiv_rag_qa.data.download_data import fetch_arxiv_pdfs
-from arxiv_rag_qa.data.generate_embeddings import generate_embeddings
+from arxiv_rag_qa.api.qdrant_model import QdrantRequest
+from arxiv_rag_qa.api.rag_model import RagRequest
+from arxiv_rag_qa.celery_config import celery_app
 from arxiv_rag_qa.data.generate_test_data import generate_test_data
-from arxiv_rag_qa.data.parse_pdf_to_json import parse_pdfs_to_json
-from arxiv_rag_qa.eval.eval_generator import generator_eval
-from arxiv_rag_qa.eval.eval_retriever import retriever_eval
-from arxiv_rag_qa.rag.qdrant_manager import QdrantManager
-from arxiv_rag_qa.rag.rag import get_response
+from arxiv_rag_qa.db.models import Base, TaskStatus
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastApi setup
-app = FastAPI(title="RAG service")
+# Database setup
+DATABASE_URL = "postgresql://airflow:airflow@postgres/airflow"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
+
+# Создание таблиц
+Base.metadata.create_all(bind=engine)
+
+# FastAPI setup
+app = FastAPI(title="RAG Service with Async Tasks")
 
 
-@app.post("/download-papers", response_model=DownloadResponse)
-def download_papers(request: DownloadRequest):
-    """Download and parse arXiv papers."""
+@app.post("/download-papers", response_model=dict)
+async def download_papers(request: DownloadRequest):
+    """Асинхронное скачивание статей - возвращает ID задачи"""
     try:
-        count = fetch_arxiv_pdfs(
-            category=request.category,
-            start_date=request.start_date,
-            target_count=request.target_count,
-            results_per_request=request.results_per_request,
-            bucket_name=request.bucket_name,
-            pdf_dir=request.pdf_dir,
-            metadata_dir=request.metadata_dir,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id, task_type="download_papers", status="pending", created_at=datetime.utcnow()
         )
-        return DownloadResponse(
-            message="PDF downloaded successfully",
-            downloaded_papers_number=count,
-            category=request.category,
-            start_date=request.start_date,
-            target_count=request.target_count,
-            results_per_request=request.results_per_request,
-            bucket_name=request.bucket_name,
-            pdf_dir=request.pdf_dir,
-            metadata_dir=request.metadata_dir,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        # Отправка задачи в Celery
+        task_data = {
+            "category": request.category,
+            "start_date": request.start_date,
+            "target_count": request.target_count,
+            "results_per_request": request.results_per_request,
+            "bucket_name": request.bucket_name,
+            "pdf_dir": request.pdf_dir,
+            "metadata_dir": request.metadata_dir,
+        }
+
+        celery_app.send_task("download_papers", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Download task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Parsing failed: {e}")
+        logger.error(f"Failed to queue download task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/parse-pdf", response_model=ParseResponse)
-def parse_pdfs(request: ParseRequest):
-    """Convert PDFs to JSON with full text."""
+@app.post("/parse-pdf", response_model=dict)
+async def parse_pdfs(request: ParseRequest):
+    """Асинхронный парсинг PDF - возвращает ID задачи"""
     try:
-        count = parse_pdfs_to_json(
-            bucket_name=request.bucket_name,
-            metadata_dir=request.metadata_dir,
-            json_dir=request.json_dir,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id, task_type="parse_pdfs", status="pending", created_at=datetime.utcnow()
         )
-        return ParseResponse(
-            message="PDF to json parsed successfully",
-            parsed_papers_number=count,
-            bucket_name=request.bucket_name,
-            metadata_dir=request.metadata_dir,
-            json_dir=request.json_dir,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "bucket_name": request.bucket_name,
+            "metadata_dir": request.metadata_dir,
+            "json_dir": request.json_dir,
+        }
+
+        celery_app.send_task("parse_pdfs", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Parse task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Parsing failed: {e}")
+        logger.error(f"Failed to queue parse task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/chunking", response_model=ChunkResponse)
-def process_all_papers(request: ChunkRequest):
-    """Chunk all JSON files into embeddings-ready format."""
+@app.post("/chunking", response_model=dict)
+async def process_all_papers(request: ChunkRequest):
+    """Асинхронное чанкирование - возвращает ID задачи"""
     try:
-        total_chunks = process_all_papers_to_chunks(
-            bucket_name=request.bucket_name,
-            chunk_dir=request.chunk_dir,
-            json_dir=request.json_dir,
-            chunk_size=request.chunk_size,
-            chunk_overlap=request.chunk_overlap,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id, task_type="process_chunks", status="pending", created_at=datetime.utcnow()
         )
-        return ChunkResponse(
-            message="Chunking success",
-            bucket_name=request.bucket_name,
-            total_chunks=total_chunks,
-            chunk_dir=request.chunk_dir,
-            json_dir=request.json_dir,
-            chunk_size=request.chunk_size,
-            chunk_overlap=request.chunk_overlap,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "bucket_name": request.bucket_name,
+            "chunk_dir": request.chunk_dir,
+            "json_dir": request.json_dir,
+            "chunk_size": request.chunk_size,
+            "chunk_overlap": request.chunk_overlap,
+        }
+
+        celery_app.send_task("process_chunks", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Chunking task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Processing failed: {e}")
+        logger.error(f"Failed to queue chunking task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/embeddings", response_model=EmbeddingsResponse)
-def create_embeddings(request: EmbeddingsRequest):
-    """Create embeddings of chunked data texts"""
+@app.post("/embeddings", response_model=dict)
+async def create_embeddings(request: EmbeddingsRequest):
+    """Асинхронная генерация эмбеддингов - возвращает ID задачи"""
     try:
-        count = generate_embeddings(
-            bucket_name=request.bucket_name,
-            chunk_dir=request.chunk_dir,
-            embedding_dir=request.embedding_dir,
-            model_name=request.model_name,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id,
+            task_type="create_embeddings",
+            status="pending",
+            created_at=datetime.utcnow(),
         )
-        return EmbeddingsResponse(
-            message="Embedding success",
-            bucket_name=request.bucket_name,
-            embeddings_number=count,
-            chunk_dir=request.chunk_dir,
-            embedding_dir=request.embedding_dir,
-            model_name=request.model_name,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "bucket_name": request.bucket_name,
+            "chunk_dir": request.chunk_dir,
+            "embedding_dir": request.embedding_dir,
+            "model_name": request.model_name,
+        }
+
+        celery_app.send_task("create_embeddings", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Embeddings generation task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Embeddings generation failed: {e}")
+        logger.error(f"Failed to queue embeddings task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/qdrant-setup", response_model=QdrantResponse)
-def qdrant_setup(request: QdrantRequest):
-    """Setup Qdrant db"""
+@app.post("/qdrant-setup", response_model=dict)
+async def qdrant_setup(request: QdrantRequest):
+    """Асинхронная настройка Qdrant - возвращает ID задачи"""
     try:
-        qdrant = QdrantManager(
-            host=request.host,
-            port=request.port,
-            collection_name=request.collection_name,
-            vector_size=request.vector_size,
-            bucket_name=request.bucket_name,
-            embedding_dir=request.embedding_dir,
-            timeout=request.timeout,
-            batch_size=request.batch_size,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id, task_type="setup_qdrant", status="pending", created_at=datetime.utcnow()
         )
-        count = qdrant.setup()
-        return QdrantResponse(
-            message="Collection created and data added",
-            points_number=count,
-            collection_name=request.collection_name,
-            vector_size=request.vector_size,
-            bucket_name=request.bucket_name,
-            embedding_dir=request.embedding_dir,
-            batch_size=request.batch_size,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "host": request.host,
+            "port": request.port,
+            "collection_name": request.collection_name,
+            "vector_size": request.vector_size,
+            "bucket_name": request.bucket_name,
+            "embedding_dir": request.embedding_dir,
+            "timeout": request.timeout,
+            "batch_size": request.batch_size,
+        }
+
+        celery_app.send_task("setup_qdrant", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Qdrant setup task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Qdrant setup failed: {e}")
+        logger.error(f"Failed to queue Qdrant setup task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/generate-test-data", response_model=TestDataResponse)
 def generate_test_dataset(request: TestDataRequest):
-    """Generate test data"""
+    """Синхронная генерация тестовых данных (обычно быстрая)"""
     try:
         generate_test_data(
             bucket_name=request.bucket_name,
@@ -191,86 +242,218 @@ def generate_test_dataset(request: TestDataRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/retriever-eval", response_model=RetrieverEvalResponse)
-def eval_retriever(request: RetrieverEvalRequest):
-    """Evaluate retriever"""
+@app.post("/retriever-eval", response_model=dict)
+async def eval_retriever(request: RetrieverEvalRequest):
+    """Асинхронная оценка ретривера - возвращает ID задачи"""
     try:
-        count = retriever_eval(
-            bucket_name=request.bucket_name,
-            test_data_dir=request.test_data_dir,
-            collection_name=request.collection_name,
-            top_k=request.top_k,
-            model_name=request.model_name,
-            qdrant_host=request.qdrant_host,
-            qdrant_port=request.qdrant_port,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id,
+            task_type="evaluate_retriever",
+            status="pending",
+            created_at=datetime.utcnow(),
         )
-        return RetrieverEvalResponse(
-            message="Retriever evaluated",
-            results=count,
-            bucket_name=request.bucket_name,
-            test_data_dir=request.test_data_dir,
-            collection_name=request.collection_name,
-            top_k=request.top_k,
-            model_name=request.model_name,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "bucket_name": request.bucket_name,
+            "test_data_dir": request.test_data_dir,
+            "collection_name": request.collection_name,
+            "top_k": request.top_k,
+            "model_name": request.model_name,
+            "qdrant_host": request.qdrant_host,
+            "qdrant_port": request.qdrant_port,
+        }
+
+        celery_app.send_task("evaluate_retriever", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Retriever evaluation task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Retriever evaluation failed: {e}")
+        logger.error(f"Failed to queue retriever evaluation task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/generator-eval", response_model=GeneratorEvalResponse)
-def eval_generator(request: GeneratorEvalRequest):
-    """Evaluate generator"""
+@app.post("/generator-eval", response_model=dict)
+async def eval_generator(request: GeneratorEvalRequest):
+    """Асинхронная оценка генератора - возвращает ID задачи"""
     try:
-        count = generator_eval(
-            bucket_name=request.bucket_name,
-            test_data_dir=request.test_data_dir,
-            collection_name=request.collection_name,
-            top_k=request.top_k,
-            emb_model_name=request.emb_model_name,
-            gen_model_name=request.gen_model_name,
-            bertscore_model=request.bertscore_model,
-            qdrant_host=request.qdrant_host,
-            qdrant_port=request.qdrant_port,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id,
+            task_type="evaluate_generator",
+            status="pending",
+            created_at=datetime.utcnow(),
         )
-        return GeneratorEvalResponse(
-            message="Generator evaluated",
-            results=count,
-            bucket_name=request.bucket_name,
-            test_data_dir=request.test_data_dir,
-            collection_name=request.collection_name,
-            top_k=request.top_k,
-            emb_model_name=request.emb_model_name,
-            gen_model_name=request.gen_model_name,
-            bertscore_model=request.bertscore_model,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "bucket_name": request.bucket_name,
+            "test_data_dir": request.test_data_dir,
+            "collection_name": request.collection_name,
+            "top_k": request.top_k,
+            "emb_model_name": request.emb_model_name,
+            "gen_model_name": request.gen_model_name,
+            "bertscore_model": request.bertscore_model,
+            "qdrant_host": request.qdrant_host,
+            "qdrant_port": request.qdrant_port,
+        }
+
+        celery_app.send_task("evaluate_generator", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Generator evaluation task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Generator evaluation failed: {e}")
+        logger.error(f"Failed to queue generator evaluation task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/get-response", response_model=RagResponse)
-def get_rag_response(request: RagRequest):
-    """Get RAG response"""
+@app.post("/get-response", response_model=dict)
+async def get_rag_response(request: RagRequest):
+    """Асинхронный RAG запрос - возвращает ID задачи"""
     try:
-        count = get_response(
-            emb_model_name=request.emb_model_name,
-            collection_name=request.collection_name,
-            top_k=request.top_k,
-            gen_model_name=request.gen_model_name,
-            query=request.query,
-            qdrant_host=request.qdrant_host,
-            qdrant_port=request.qdrant_port,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id, task_type="get_rag_response", status="pending", created_at=datetime.utcnow()
         )
-        return RagResponse(
-            message="Query was processed",
-            results=count,
-            emb_model_name=request.emb_model_name,
-            collection_name=request.collection_name,
-            top_k=request.top_k,
-            gen_model_name=request.gen_model_name,
-            query=request.query,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "emb_model_name": request.emb_model_name,
+            "collection_name": request.collection_name,
+            "top_k": request.top_k,
+            "gen_model_name": request.gen_model_name,
+            "query": request.query,
+            "qdrant_host": request.qdrant_host,
+            "qdrant_port": request.qdrant_port,
+        }
+
+        celery_app.send_task("get_rag_response", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "RAG query task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Failed to get response from RAG: {e}")
+        logger.error(f"Failed to queue RAG query task: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ===== Эндпоинты для отслеживания статуса задач =====
+
+
+@app.get("/tasks/{task_id}", response_model=TaskStatusResponse)
+async def get_task_status(task_id: str):
+    """Получить статус конкретной задачи"""
+    try:
+        db = SessionLocal()
+        task = db.query(TaskStatus).filter(TaskStatus.id == task_id).first()
+        db.close()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        return TaskStatusResponse(**task.to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get task status: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/tasks", response_model=TaskListResponse)
+async def list_tasks(
+    task_type: str | None = None, status: str | None = None, limit: int = 100, offset: int = 0
+):
+    try:
+        db = SessionLocal()
+
+        query = select(TaskStatus)
+
+        if task_type:
+            query = query.where(TaskStatus.task_type == task_type)
+        if status:
+            query = query.where(TaskStatus.status == status)
+
+        query = query.order_by(TaskStatus.created_at.desc()).limit(limit).offset(offset)
+
+        result = db.execute(query)
+        tasks = [task.to_dict() for task in result.scalars().all()]
+
+        db.close()
+
+        return TaskListResponse(tasks=tasks, total=len(tasks))
+
+    except Exception as e:
+        logger.error(f"Failed to list tasks: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.delete("/tasks/{task_id}")
+async def delete_task(task_id: str):
+    try:
+        db = SessionLocal()
+        task = db.query(TaskStatus).filter(TaskStatus.id == task_id).first()
+
+        if not task:
+            db.close()
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        db.delete(task)
+        db.commit()
+        db.close()
+
+        return {"message": "Task deleted successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete task: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get("/tasks/stats")
+async def get_tasks_stats():
+    """Получить статистику по задачам"""
+    try:
+        db = SessionLocal()
+
+        total = db.query(TaskStatus).count()
+        pending = db.query(TaskStatus).filter(TaskStatus.status == "pending").count()
+        processing = db.query(TaskStatus).filter(TaskStatus.status == "processing").count()
+        completed = db.query(TaskStatus).filter(TaskStatus.status == "completed").count()
+        failed = db.query(TaskStatus).filter(TaskStatus.status == "failed").count()
+
+        db.close()
+
+        return {
+            "total": total,
+            "pending": pending,
+            "processing": processing,
+            "completed": completed,
+            "failed": failed,
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get tasks stats: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e

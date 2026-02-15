@@ -182,6 +182,39 @@ services:
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
 
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    # Критически важно для MacBook с 8GB RAM:
+    command:
+      celery -A arxiv_rag_qa.celery_config worker --loglevel=info
+      --concurrency=1 --pool=solo --max-tasks-per-child=10 --hostname=worker@%h
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}:/app
+    environment:
+      - PYTHONPATH=/app/src
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_ENDPOINT_URL=http://minio:9000
+      - AWS_DEFAULT_REGION=us-east-1
+      - DATABASE_URL=postgresql://airflow:airflow@postgres/airflow
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+    # Ограничение памяти для стабильности
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+
 volumes:
   postgres-db-volume:
   minio_data:

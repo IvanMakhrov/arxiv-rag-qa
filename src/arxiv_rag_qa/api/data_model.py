@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -86,3 +88,20 @@ class TestDataResponse(BaseModel):
     test_data_dir: str
     metadata_dir: str
     test_data_size: int
+
+
+class TaskStatusResponse(BaseModel):
+    id: str
+    task_type: str
+    status: str  # pending, processing, completed, failed
+    created_at: datetime | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    error_message: str | None
+    progress: int
+    result_data: str | None  # JSON string
+
+
+class TaskListResponse(BaseModel):
+    tasks: list[TaskStatusResponse]
+    total: int

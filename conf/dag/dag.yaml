@@ -2,3 +2,8 @@ http_conn_id: rag_service
 response_check: 200
 retries: 1
 retry_delay: 1
+download_timeout: 7200 # 2 часа для скачивания
+parse_timeout: 3600 # 1 час для парсинга
+chunking_timeout: 5400 # 1.5 часа для чанкирования
+embeddings_timeout: 10800 # 3 часа для эмбеддингов
+test_data_timeout: 1800 # 30 минут для тестовых данных
