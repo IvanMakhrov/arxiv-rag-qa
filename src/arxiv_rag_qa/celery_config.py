@@ -2,11 +2,8 @@ import os
 
 from celery import Celery
 
-# Настройки брокера и бэкенда
-broker_url = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
-result_backend = os.getenv(
-    "CELERY_RESULT_BACKEND", "db+postgresql://airflow:airflow@postgres/airflow"
-)
+broker_url = os.getenv("CELERY_BROKER_URL")
+result_backend = os.getenv("CELERY_RESULT_BACKEND")
 
 celery_app = Celery(
     "arxiv_rag_qa",
@@ -17,13 +14,13 @@ celery_app = Celery(
         "arxiv_rag_qa.tasks.parse",
         "arxiv_rag_qa.tasks.chunk",
         "arxiv_rag_qa.tasks.embeddings",
+        "arxiv_rag_qa.tasks.test_data",
         "arxiv_rag_qa.tasks.qdrant",
         "arxiv_rag_qa.tasks.eval",
         "arxiv_rag_qa.tasks.rag",
     ],
 )
 
-# Настройки Celery
 celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],

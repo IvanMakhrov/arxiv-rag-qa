@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from arxiv_rag_qa.db.models import Base, TaskStatus
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://airflow:airflow@postgres/airflow")
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 

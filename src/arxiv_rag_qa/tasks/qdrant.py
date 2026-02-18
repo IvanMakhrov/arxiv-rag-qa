@@ -12,10 +12,8 @@ def setup_qdrant_task(self, request_data):
     task_id = self.request.id
 
     try:
-        # Обновление статуса: начало выполнения
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
-        # Выполнение задачи
         qdrant = QdrantManager(
             host=request_data["host"],
             port=request_data["port"],
@@ -29,13 +27,15 @@ def setup_qdrant_task(self, request_data):
 
         count = qdrant.setup()
 
-        # Подготовка результата
         result_data = {
             "points_number": count,
             "collection_name": request_data["collection_name"],
+            "vector_size": request_data["vector_size"],
+            "bucket_name": request_data["bucket_name"],
+            "embedding_dir": request_data["embedding_dir"],
+            "batch_size": request_data["batch_size"],
         }
 
-        # Обновление статуса: завершение
         self.update_task_status(
             task_id,
             status="completed",
@@ -47,7 +47,6 @@ def setup_qdrant_task(self, request_data):
         return result_data
 
     except Exception as e:
-        # Обновление статуса: ошибка
         self.update_task_status(
             task_id, status="failed", error_message=str(e), completed_at=datetime.utcnow()
         )

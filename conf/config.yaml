@@ -9,5 +9,6 @@ defaults:
   - test_data: test_data
   - qdrant: qdrant
   - minio: minio
+  - mlflow: mlflow
   - eval: eval
   - _self_

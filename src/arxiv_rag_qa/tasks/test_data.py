@@ -2,36 +2,31 @@ import json
 from datetime import datetime
 
 from arxiv_rag_qa.celery_config import celery_app
-from arxiv_rag_qa.data.download_data import fetch_arxiv_pdfs
+from arxiv_rag_qa.data.generate_test_data import generate_test_data
 from arxiv_rag_qa.tasks.base import DatabaseTask
 
 
-@celery_app.task(bind=True, base=DatabaseTask, name="download_papers")
-def download_papers_task(self, request_data):
-    """Асинхронная задача для скачивания статей"""
+@celery_app.task(bind=True, base=DatabaseTask, name="generate_test_data")
+def generate_test_data_task(self, request_data):
+    """Асинхронная задача для генерации тестовых данных"""
     task_id = self.request.id
 
     try:
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
-        count = fetch_arxiv_pdfs(
-            category=request_data["category"],
-            start_date=request_data["start_date"],
-            target_count=request_data["target_count"],
-            results_per_request=request_data["results_per_request"],
+        generate_test_data(
             bucket_name=request_data["bucket_name"],
-            pdf_dir=request_data["pdf_dir"],
+            chunk_dir=request_data["chunk_dir"],
+            test_data_dir=request_data["test_data_dir"],
             metadata_dir=request_data["metadata_dir"],
+            test_data_size=request_data["test_data_size"],
         )
 
         result_data = {
-            "downloaded_papers_number": count,
-            "category": request_data["category"],
-            "start_date": request_data["start_date"],
-            "target_count": request_data["target_count"],
-            "results_per_request": request_data["results_per_request"],
+            "test_data_size": request_data["test_data_size"],
             "bucket_name": request_data["bucket_name"],
-            "pdf_dir": request_data["pdf_dir"],
+            "chunk_dir": request_data["chunk_dir"],
+            "test_data_dir": request_data["test_data_dir"],
             "metadata_dir": request_data["metadata_dir"],
         }
 

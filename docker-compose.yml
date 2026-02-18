@@ -102,6 +102,9 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_ENDPOINT_URL=http://minio:9000
       - AWS_DEFAULT_REGION=us-east-1
+      - DATABASE_URL=postgresql://airflow:airflow@postgres/airflow
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
     restart: unless-stopped
 
   redis:
@@ -186,7 +189,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.celery
-    # Критически важно для MacBook с 8GB RAM:
     command:
       celery -A arxiv_rag_qa.celery_config worker --loglevel=info
       --concurrency=1 --pool=solo --max-tasks-per-child=10 --hostname=worker@%h
@@ -209,7 +211,6 @@ services:
       minio:
         condition: service_started
     restart: unless-stopped
-    # Ограничение памяти для стабильности
     deploy:
       resources:
         limits:

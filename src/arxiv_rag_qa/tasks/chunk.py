@@ -25,6 +25,10 @@ def process_chunks_task(self, request_data):
         result_data = {
             "total_chunks": total_chunks,
             "bucket_name": request_data["bucket_name"],
+            "chunk_dir": request_data["chunk_dir"],
+            "json_dir": request_data["json_dir"],
+            "chunk_size": request_data["chunk_size"],
+            "chunk_overlap": request_data["chunk_overlap"],
         }
 
         self.update_task_status(

@@ -25,8 +25,8 @@ def log_to_mlflow(
 
     mlflow.set_experiment(experiment_name)
 
-    metrics = http_response["results"]["metrics"] if "results" in http_response else {}
-    params = {f"{stage}_{k}": v for k, v in http_response.items() if k != "results"}
+    metrics = http_response["metrics"]
+    params = http_response["params"]
 
     with mlflow.start_run(run_id=run_id, run_name=run_name) as run:
         mlflow.set_tags({"airflow_task_id": task_id, "stage": stage, "source": "airflow_http_task"})

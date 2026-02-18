@@ -12,10 +12,8 @@ def create_embeddings_task(self, request_data):
     task_id = self.request.id
 
     try:
-        # Обновление статуса: начало выполнения
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
-        # Выполнение задачи
         count = generate_embeddings(
             bucket_name=request_data["bucket_name"],
             chunk_dir=request_data["chunk_dir"],
@@ -23,14 +21,14 @@ def create_embeddings_task(self, request_data):
             model_name=request_data["model_name"],
         )
 
-        # Подготовка результата
         result_data = {
             "embeddings_number": count,
             "bucket_name": request_data["bucket_name"],
             "model_name": request_data["model_name"],
+            "chunk_dir": request_data["chunk_dir"],
+            "embedding_dir": request_data["embedding_dir"],
         }
 
-        # Обновление статуса: завершение
         self.update_task_status(
             task_id,
             status="completed",
@@ -42,7 +40,6 @@ def create_embeddings_task(self, request_data):
         return result_data
 
     except Exception as e:
-        # Обновление статуса: ошибка
         self.update_task_status(
             task_id, status="failed", error_message=str(e), completed_at=datetime.utcnow()
         )

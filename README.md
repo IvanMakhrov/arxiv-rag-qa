@@ -75,6 +75,7 @@ docker compose up
 - Контроль качества кода: Ruff
 - Hooks: pre-commit
 - Гиперпараметры: Hydra
+- Очередь задач: Celery
 
 ## UI:
 

@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime
 
@@ -14,7 +15,6 @@ from arxiv_rag_qa.api.data_model import (
     TaskListResponse,
     TaskStatusResponse,
     TestDataRequest,
-    TestDataResponse,
 )
 from arxiv_rag_qa.api.eval_model import (
     GeneratorEvalRequest,
@@ -23,7 +23,6 @@ from arxiv_rag_qa.api.eval_model import (
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest
 from arxiv_rag_qa.api.rag_model import RagRequest
 from arxiv_rag_qa.celery_config import celery_app
-from arxiv_rag_qa.data.generate_test_data import generate_test_data
 from arxiv_rag_qa.db.models import Base, TaskStatus
 
 # Logging setup
@@ -31,7 +30,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Database setup
-DATABASE_URL = "postgresql://airflow:airflow@postgres/airflow"
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
@@ -55,7 +54,6 @@ async def download_papers(request: DownloadRequest):
         db.commit()
         db.close()
 
-        # Отправка задачи в Celery
         task_data = {
             "category": request.category,
             "start_date": request.start_date,
@@ -218,27 +216,40 @@ async def qdrant_setup(request: QdrantRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.post("/generate-test-data", response_model=TestDataResponse)
-def generate_test_dataset(request: TestDataRequest):
-    """Синхронная генерация тестовых данных (обычно быстрая)"""
+@app.post("/generate-test-data", response_model=dict)
+async def generate_test_dataset(request: TestDataRequest):
+    """Асинхронная генерация тестовых данных - возвращает ID задачи"""
     try:
-        generate_test_data(
-            bucket_name=request.bucket_name,
-            chunk_dir=request.chunk_dir,
-            test_data_dir=request.test_data_dir,
-            metadata_dir=request.metadata_dir,
-            test_data_size=request.test_data_size,
+        task_id = str(uuid.uuid4())
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id,
+            task_type="generate_test_data",
+            status="pending",
+            created_at=datetime.utcnow(),
         )
-        return TestDataResponse(
-            message="Test data was generated",
-            bucket_name=request.bucket_name,
-            chunk_dir=request.chunk_dir,
-            test_data_dir=request.test_data_dir,
-            metadata_dir=request.metadata_dir,
-            test_data_size=request.test_data_size,
-        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "bucket_name": request.bucket_name,
+            "chunk_dir": request.chunk_dir,
+            "test_data_dir": request.test_data_dir,
+            "metadata_dir": request.metadata_dir,
+            "test_data_size": request.test_data_size,
+        }
+
+        celery_app.send_task("generate_test_data", args=[task_data], task_id=task_id)
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Test data generation task queued successfully",
+        }
+
     except Exception as e:
-        logger.error(f"Test data generation failed: {e}")
+        logger.error(f"Failed to queue test data generation task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

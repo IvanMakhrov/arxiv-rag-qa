@@ -13,10 +13,8 @@ def evaluate_retriever_task(self, request_data):
     task_id = self.request.id
 
     try:
-        # Обновление статуса: начало выполнения
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
-        # Выполнение задачи
         results = retriever_eval(
             bucket_name=request_data["bucket_name"],
             test_data_dir=request_data["test_data_dir"],
@@ -27,15 +25,15 @@ def evaluate_retriever_task(self, request_data):
             qdrant_port=request_data["qdrant_port"],
         )
 
-        # Подготовка результата
         result_data = {
             "results": results,
+            "bucket_name": request_data["bucket_name"],
+            "test_data_dir": request_data["test_data_dir"],
             "collection_name": request_data["collection_name"],
             "top_k": request_data["top_k"],
             "model_name": request_data["model_name"],
         }
 
-        # Обновление статуса: завершение
         self.update_task_status(
             task_id,
             status="completed",
@@ -47,7 +45,6 @@ def evaluate_retriever_task(self, request_data):
         return result_data
 
     except Exception as e:
-        # Обновление статуса: ошибка
         self.update_task_status(
             task_id, status="failed", error_message=str(e), completed_at=datetime.utcnow()
         )
@@ -60,10 +57,8 @@ def evaluate_generator_task(self, request_data):
     task_id = self.request.id
 
     try:
-        # Обновление статуса: начало выполнения
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
-        # Выполнение задачи
         results = generator_eval(
             bucket_name=request_data["bucket_name"],
             test_data_dir=request_data["test_data_dir"],
@@ -76,16 +71,17 @@ def evaluate_generator_task(self, request_data):
             qdrant_port=request_data["qdrant_port"],
         )
 
-        # Подготовка результата
         result_data = {
             "results": results,
+            "bucket_name": request_data["bucket_name"],
+            "test_data_dir": request_data["test_data_dir"],
             "collection_name": request_data["collection_name"],
             "top_k": request_data["top_k"],
             "emb_model_name": request_data["emb_model_name"],
             "gen_model_name": request_data["gen_model_name"],
+            "bertscore_model": request_data["bertscore_model"],
         }
 
-        # Обновление статуса: завершение
         self.update_task_status(
             task_id,
             status="completed",
@@ -97,7 +93,6 @@ def evaluate_generator_task(self, request_data):
         return result_data
 
     except Exception as e:
-        # Обновление статуса: ошибка
         self.update_task_status(
             task_id, status="failed", error_message=str(e), completed_at=datetime.utcnow()
         )
