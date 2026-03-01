@@ -3,6 +3,11 @@ from typing import Any
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, SearchRequest
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 class DenseRetriever:
     def __init__(
@@ -39,17 +44,20 @@ class DenseRetriever:
         Returns:
             List of hits, each with keys: 'id', 'score', 'payload'
         """
-        k = top_k or self.top_k
-        query_vector = self.embed(query)
+        try:
+            k = top_k or self.top_k
+            query_vector = self.embed(query)
 
-        results = self.client.query_points(
-            collection_name=self.collection_name,
-            query=query_vector,
-            query_filter=filter_,
-            limit=k,
-            with_payload=with_payload,
-            with_vectors=with_vectors,
-        )
+            results = self.client.query_points(
+                collection_name=self.collection_name,
+                query=query_vector,
+                query_filter=filter_,
+                limit=k,
+                with_payload=with_payload,
+                with_vectors=with_vectors,
+            )
+        except Exception as e:
+            logger.error(f"Error getting data from vector db: {e}")
 
         return [
             {

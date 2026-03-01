@@ -5,6 +5,10 @@ import boto3
 from sentence_transformers import SentenceTransformer
 
 from arxiv_rag_qa.rag.retriever import DenseRetriever
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
 
 
 def get_minio_client():
@@ -21,6 +25,7 @@ def load_test_set_from_minio(bucket_name: str, test_data_key: str, s3_client: An
                 samples.append(json.loads(line.decode("utf-8")))
         return samples
     except Exception as e:
+        logger.error(f"Test file not found in s3://{bucket_name}/{test_data_key}: {e}")
         raise FileNotFoundError(
             f"Test file not found in s3://{bucket_name}/{test_data_key}: {e}"
         ) from e
@@ -76,7 +81,7 @@ def retriever_eval(
     hit_rates = []
 
     for i, sample in enumerate(test_samples):
-        print(f"\rEvaluating {i + 1}/{len(test_samples)}", end="", flush=True)
+        logger.info(f"\rEvaluating {i + 1}/{len(test_samples)}")
 
         docs = retriever.retrieve(sample["question"], top_k=top_k)
         retrieved_ids = [doc["id"] for doc in docs]
@@ -94,10 +99,10 @@ def retriever_eval(
     avg_mrr = sum(mrr_scores) / len(mrr_scores)
     avg_hit = sum(hit_rates) / len(hit_rates)
 
-    print(f"Top-k: {top_k}")
-    print(f"Recall@{top_k}:   {avg_recall:.4f}")
-    print(f"MRR@{top_k}:      {avg_mrr:.4f}")
-    print(f"Hit Rate@{top_k}: {avg_hit:.4f}")
+    logger.info(
+        f"Metrics: Top-k: {top_k}, Recall@{top_k}: {avg_recall:.4f}, "
+        f"MRR@{top_k}: {avg_mrr:.4f}, Hit Rate@{top_k}: {avg_hit:.4f}"
+    )
 
     return {
         "config": {

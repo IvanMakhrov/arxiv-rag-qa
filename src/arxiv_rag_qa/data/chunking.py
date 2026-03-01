@@ -3,6 +3,11 @@ import re
 
 import boto3
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 def get_minio_client():
     return boto3.client("s3")
@@ -72,6 +77,7 @@ def process_all_papers_to_chunks(
             )
 
     if not json_files:
+        logger.error(f"No JSON files found in s3://{bucket_name}/{json_dir}")
         raise FileNotFoundError(f"No JSON files found in s3://{bucket_name}/{json_dir}")
 
     all_chunks = []
@@ -105,7 +111,7 @@ def process_all_papers_to_chunks(
                     )
 
         except Exception as e:
-            print(f"Failed to process {json_path}: {e}")
+            logger.error(f"Failed to process {json_path}: {e}")
             continue
 
     jsonl_content = "\n".join(json.dumps(chunk, ensure_ascii=False) for chunk in all_chunks)
@@ -116,6 +122,6 @@ def process_all_papers_to_chunks(
         ContentType="application/jsonl",
     )
 
-    print(f"Saved {len(all_chunks)} chunks to s3://{bucket_name}/{chunk_dir}")
+    logger.info(f"Saved {len(all_chunks)} chunks to s3://{bucket_name}/{chunk_dir}")
 
     return len(all_chunks)

@@ -3,6 +3,11 @@ from typing import Any
 
 import boto3
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 def get_minio_client():
     return boto3.client("s3")
@@ -20,6 +25,7 @@ def load_chunks_from_minio(
                 chunks.append(json.loads(line.decode("utf-8")))
         return chunks
     except Exception as e:
+        logger.error(f"Chunk file not found in s3://{bucket_name}/{chunk_key}: {e}")
         raise FileNotFoundError(
             f"Chunk file not found in s3://{bucket_name}/{chunk_key}: {e}"
         ) from e
@@ -34,6 +40,7 @@ def load_metadata_from_minio(
         papers = json.loads(response["Body"].read().decode("utf-8"))
         return {paper["arxiv_id"]: paper for paper in papers}
     except Exception as e:
+        logger.error(f"Metadata file not found in s3://{bucket_name}/{metadata_key}: {e}")
         raise FileNotFoundError(
             f"Metadata file not found in s3://{bucket_name}/{metadata_key}: {e}"
         ) from e
@@ -114,7 +121,8 @@ def generate_test_data(
     chunks = load_chunks_from_minio(bucket_name, chunk_dir, s3_client)
 
     if not chunks:
-        raise ValueError("No chunks found. Run ingestion first.")
+        logger.error("No chunks found. Run ingestion first")
+        raise ValueError("No chunks found. Run ingestion first")
 
     metadata_map = load_metadata_from_minio(bucket_name, metadata_dir, s3_client)
     paper_to_chunks = build_paper_to_chunks(chunks)
@@ -133,6 +141,6 @@ def generate_test_data(
         ContentType="application/jsonl",
     )
 
-    print(f"Saved {len(test_samples)} test samples to s3://{bucket_name}/{test_data_dir}")
+    logger.info(f"Saved {len(test_samples)} test samples to s3://{bucket_name}/{test_data_dir}")
 
     return len(test_samples)

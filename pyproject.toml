@@ -13,6 +13,7 @@ dependencies = [
   "pandas>=2.3.3",
   "tqdm>=4.67.1",
   "seaborn>=0.13.2",
+  "python-json-logger>=2.0.0",
 ]
 
 [project.optional-dependencies]

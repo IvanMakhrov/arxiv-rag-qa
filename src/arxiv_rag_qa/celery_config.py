@@ -27,11 +27,19 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    # Task tracking
     task_track_started=True,
-    task_time_limit=3600 * 24,  # 24 часа максимум на задачу
+    task_time_limit=3600 * 24,  # 24 hours max per task
     task_soft_time_limit=3600 * 23,
-    worker_prefetch_multiplier=1,  # Важно для долгих задач
-    worker_max_tasks_per_child=10,  # Перезапуск воркера после 10 задач
+    # Worker optimization for long tasks
+    worker_prefetch_multiplier=1,
+    worker_max_tasks_per_child=10,
+    # Monitoring: Enable task events for celery-exporter
+    worker_send_task_events=True,
+    task_send_sent_event=True,
+    # Optional: Prevent event loss
+    event_queue_ttl=0,
+    event_queue_expires=0,
 )
 
 app = celery_app

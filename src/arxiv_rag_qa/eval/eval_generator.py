@@ -10,6 +10,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from arxiv_rag_qa.rag.generator import QwenGenerator
 from arxiv_rag_qa.rag.retriever import DenseRetriever
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
 
 
 def get_minio_client():
@@ -26,6 +30,7 @@ def load_test_set_from_minio(bucket: str, test_data_key: str, s3_client: Any) ->
                 samples.append(json.loads(line.decode("utf-8")))
         return samples
     except Exception as e:
+        logger.error(f"Test file not found in s3://{bucket}/{test_data_key}: {e}")
         raise FileNotFoundError(f"Test file not found in s3://{bucket}/{test_data_key}: {e}") from e
 
 
@@ -105,7 +110,7 @@ def generator_eval(
     contexts = []
 
     for i, sample in enumerate(test_samples):
-        print(f"\rGenerating {i + 1}/{len(test_samples)}", end="", flush=True)
+        logger.info(f"\rGenerating {i + 1}/{len(test_samples)}")
 
         docs = retriever.retrieve(sample["question"], top_k=top_k)
         context = "\n\n".join([doc["payload"]["text"] for doc in docs])
@@ -121,10 +126,10 @@ def generator_eval(
     bert_f1 = compute_bertscore(predictions, references, bertscore_model)
     faithfulness = compute_faithfulness(predictions, contexts)
 
-    print(f"ROUGE-L:      {rouge['rougeL']:.4f}")
-    print(f"BLEU:         {bleu:.4f}")
-    print(f"BERTScore F1: {bert_f1:.4f}")
-    print(f"Faithfulness: {faithfulness:.4f}")
+    logger.info(
+        f"Metrics: ROUGE-L: {rouge['rougeL']:.4f}, BLEU: {bleu:.4f}, "
+        f"BERTScore F1: {bert_f1:.4f}, Faithfulness: {faithfulness:.4f}"
+    )
 
     return {
         "config": {

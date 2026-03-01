@@ -7,6 +7,11 @@ from urllib.parse import quote
 import boto3
 import requests
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 def get_minio_client():
     return boto3.client("s3")
@@ -14,18 +19,23 @@ def get_minio_client():
 
 def save_metadata_to_minio(data: list, bucket_name: str, metadata_key: str, s3_client: Any):
     """Save metadata JSON to MinIO as a single object."""
-    json_str = json.dumps(data, indent=2)
-    s3_client.put_object(
-        Bucket=bucket_name, Key=metadata_key, Body=json_str, ContentType="application/json"
-    )
-    print(f"Metadata saved to s3://{bucket_name}/{metadata_key}")
+    try:
+        json_str = json.dumps(data, indent=2)
+        s3_client.put_object(
+            Bucket=bucket_name, Key=metadata_key, Body=json_str, ContentType="application/json"
+        )
+        logger.info(f"Metadata saved to s3://{bucket_name}/{metadata_key}")
+    except Exception as e:
+        logger.error(f"Error saving metadata to s3://{bucket_name}/{metadata_key}: {e}")
 
 
 def create_bucket(bucket_name: str, s3_client: Any):
     try:
         s3_client.head_bucket(Bucket=bucket_name)
+        logger.info(f"Bucket {bucket_name} already exists")
     except Exception:
         s3_client.create_bucket(Bucket=bucket_name)
+        logger.info(f"Bucket {bucket_name} created")
 
 
 def fetch_arxiv_pdfs(
@@ -53,7 +63,7 @@ def fetch_arxiv_pdfs(
     downloaded = {}
     start_index = 0
 
-    print(f"Target: {target_count} papers from '{category}' since {start_date[:8]}")
+    logger.info(f"Target: {target_count} papers from '{category}' since {start_date[:8]}")
 
     while len(downloaded) < target_count:
         remaining = target_count - len(downloaded)
@@ -71,7 +81,7 @@ def fetch_arxiv_pdfs(
             f"max_results={batch_size}"
         )
 
-        print(
+        logger.info(
             f"Requesting papers {start_index}-{start_index + batch_size - 1} "
             f"(total so far: {len(downloaded)})"
         )
@@ -80,7 +90,7 @@ def fetch_arxiv_pdfs(
             response = requests.get(url, headers=headers, timeout=30)
             response.raise_for_status()
         except Exception as e:
-            print(f"API request failed: {e}. Retrying in 5s")
+            logger.warning(f"API request failed: {e}. Retrying in 5s")
             time.sleep(5)
             continue
 
@@ -88,7 +98,7 @@ def fetch_arxiv_pdfs(
         entries = root.findall("{http://www.w3.org/2005/Atom}entry")
 
         if not entries:
-            print("No more papers available")
+            logger.info("No more papers available")
             break
 
         for entry in entries:
@@ -104,7 +114,7 @@ def fetch_arxiv_pdfs(
 
                 try:
                     s3_client.head_object(Bucket=bucket_name, Key=pdf_path)
-                    print(f"Already exists in MinIO: {paper_id}")
+                    logger.warning(f"Already exists in MinIO: {paper_id}")
                     exists_in_minio = True
                 except Exception:
                     exists_in_minio = False
@@ -120,7 +130,7 @@ def fetch_arxiv_pdfs(
                         Body=pdf_resp.content,
                         ContentType="application/pdf",
                     )
-                    print(f"Uploaded to MinIO: {paper_id}")
+                    logger.info(f"Uploaded to MinIO: {paper_id}")
 
                     downloaded[paper_id] = {
                         "arxiv_id": paper_id,
@@ -131,7 +141,7 @@ def fetch_arxiv_pdfs(
                     }
                     time.sleep(1)
             except Exception as e:
-                print(f"Error processing {paper_id}: {e}")
+                logger.error(f"Error processing {paper_id}: {e}")
                 continue
 
         start_index += batch_size

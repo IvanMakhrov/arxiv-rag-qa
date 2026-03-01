@@ -1,4 +1,3 @@
-import logging
 import os
 import uuid
 from datetime import datetime
@@ -20,14 +19,15 @@ from arxiv_rag_qa.api.eval_model import (
     GeneratorEvalRequest,
     RetrieverEvalRequest,
 )
+from arxiv_rag_qa.api.middleware import LatencyMiddleware
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest
 from arxiv_rag_qa.api.rag_model import RagRequest
 from arxiv_rag_qa.celery_config import celery_app
 from arxiv_rag_qa.db.models import Base, TaskStatus
+from utils.setup_logger import setup_logger
 
 # Logging setup
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -39,6 +39,7 @@ Base.metadata.create_all(bind=engine)
 
 # FastAPI setup
 app = FastAPI(title="RAG Service with Async Tasks")
+app.add_middleware(LatencyMiddleware)
 
 
 @app.post("/download-papers", response_model=dict)
@@ -65,6 +66,8 @@ async def download_papers(request: DownloadRequest):
         }
 
         celery_app.send_task("download_papers", args=[task_data], task_id=task_id)
+
+        logger.info("Data downloaded successfully")
 
         return {
             "task_id": task_id,
@@ -97,6 +100,8 @@ async def parse_pdfs(request: ParseRequest):
         }
 
         celery_app.send_task("parse_pdfs", args=[task_data], task_id=task_id)
+
+        logger.info("Data parsed successfully")
 
         return {
             "task_id": task_id,
@@ -131,6 +136,8 @@ async def process_all_papers(request: ChunkRequest):
         }
 
         celery_app.send_task("process_chunks", args=[task_data], task_id=task_id)
+
+        logger.info("Data chunked successfully")
 
         return {
             "task_id": task_id,
@@ -168,6 +175,8 @@ async def create_embeddings(request: EmbeddingsRequest):
 
         celery_app.send_task("create_embeddings", args=[task_data], task_id=task_id)
 
+        logger.info("Embeddings created successfully")
+
         return {
             "task_id": task_id,
             "status": "pending",
@@ -204,6 +213,7 @@ async def qdrant_setup(request: QdrantRequest):
         }
 
         celery_app.send_task("setup_qdrant", args=[task_data], task_id=task_id)
+        logger.info("Qdrant setup done successfully")
 
         return {
             "task_id": task_id,
@@ -241,6 +251,7 @@ async def generate_test_dataset(request: TestDataRequest):
         }
 
         celery_app.send_task("generate_test_data", args=[task_data], task_id=task_id)
+        logger.info("Test data generated successfully")
 
         return {
             "task_id": task_id,
@@ -280,6 +291,7 @@ async def eval_retriever(request: RetrieverEvalRequest):
         }
 
         celery_app.send_task("evaluate_retriever", args=[task_data], task_id=task_id)
+        logger.info("Retriever evaluated successfully")
 
         return {
             "task_id": task_id,
@@ -321,6 +333,7 @@ async def eval_generator(request: GeneratorEvalRequest):
         }
 
         celery_app.send_task("evaluate_generator", args=[task_data], task_id=task_id)
+        logger.info("Generator evaluated successfully")
 
         return {
             "task_id": task_id,
@@ -357,6 +370,7 @@ async def get_rag_response(request: RagRequest):
         }
 
         celery_app.send_task("get_rag_response", args=[task_data], task_id=task_id)
+        logger.info("Query processed successfully")
 
         return {
             "task_id": task_id,

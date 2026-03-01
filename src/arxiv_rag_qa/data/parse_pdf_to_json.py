@@ -4,6 +4,11 @@ from typing import Any
 import boto3
 import fitz
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 def get_minio_client():
     return boto3.client("s3")
@@ -22,7 +27,7 @@ def load_metadata_from_minio(bucket: str, metadata_key: str, s3_client: Any):
     """Load metadata JSON from MinIO."""
     response = s3_client.get_object(Bucket=bucket, Key=metadata_key)
     metadata = json.loads(response["Body"].read().decode("utf-8"))
-    print(f"Metadata loaded from s3://{bucket}/{metadata_key}")
+    logger.info(f"Metadata loaded from s3://{bucket}/{metadata_key}")
     return metadata
 
 
@@ -39,6 +44,7 @@ def parse_pdfs_to_json(
     metadata = load_metadata_from_minio(bucket_name, metadata_dir, s3_client)
 
     if not metadata:
+        logger.error(f"No metadata found in s3://{bucket_name}/{metadata_dir}")
         raise ValueError(f"No metadata found in s3://{bucket_name}/{metadata_dir}")
 
     parsed_count = 0
@@ -75,9 +81,9 @@ def parse_pdfs_to_json(
             parsed_count += 1
 
         except Exception as e:
-            print(f"Failed to parse {arxiv_id}: {e}")
+            logger.error(f"Failed to parse {arxiv_id}: {e}")
             continue
 
-        print(f"Saved {parsed_count} JSON files to s3://{bucket_name}/{json_dir}")
+        logger.info(f"Saved {parsed_count} JSON files to s3://{bucket_name}/{json_dir}")
 
     return parsed_count

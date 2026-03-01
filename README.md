@@ -44,6 +44,9 @@ pre-commit install
 - `POSTGRES_PASSWORD` - пароль в postgres
 - `POSTGRES_DB` - имя БД в postgres
 
+- `GF_SECURITY_ADMIN_USER` - пользователь в Grafana
+- `GF_SECURITY_ADMIN_PASSWORD` - пароль в Grafana
+
 Для получения FERNET_KEY:<br>
 
 ```python
@@ -76,6 +79,10 @@ docker compose up
 - Hooks: pre-commit
 - Гиперпараметры: Hydra
 - Очередь задач: Celery
+- Мониторинг: Grafana
+- Real-time метрики: Prometheus
+- Promtail: Сбор логов
+- Loki: Хранение логов
 
 ## UI:
 
@@ -84,3 +91,21 @@ docker compose up
 - MLFlow: http://localhost:5050
 - Api: http://localhost:8000
 - Qdrant: http://localhost:6333/dashboard
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9090
+
+## Routers:
+
+- POST - /download-papers - Загрузка pdf
+- POST - /parse-pdf - Парсинг pdf в json
+- POST - /chunking - Чанкинг
+- POST - /embeddings - Создание эмбеддингов
+- POST - /qdrant-setup - Настройка qdrant и добавление данных
+- POST - /generate-test-data - Генерация тестовых данных
+- POST - /retriever-eval - Оценка качества ретривера
+- POST - /generator-eval - Оценка качества генератора
+- POST - /get-response - Получение ответа от RAG
+- GET - /tasks/{task_id} - Получение статуса задачи
+- GET - /tasks - Получение списка задач
+- DELETE - /tasks/{task_id} - Удаление задачи
+- GET - /tasks/stats - Статистика задач

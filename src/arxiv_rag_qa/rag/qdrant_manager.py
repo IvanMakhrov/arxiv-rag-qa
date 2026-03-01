@@ -7,6 +7,11 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models as rest
 from qdrant_client.models import PointStruct
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 class QdrantManager:
     def __init__(
@@ -72,13 +77,16 @@ class QdrantManager:
                 yield json.loads(buffer.strip())
 
         except Exception as e:
+            logger.error(
+                f"Embedding file not found in s3://{self.bucket_name}/{self.embedding_dir}: {e}"
+            )
             raise FileNotFoundError(
                 f"Embedding file not found in s3://{self.bucket_name}/{self.embedding_dir}: {e}"
             ) from e
 
     def create_collection(self) -> None:
         if self.client.collection_exists(self.collection_name):
-            print(f"Collection '{self.collection_name}' already exists.")
+            logger.info(f"Collection '{self.collection_name}' already exists.")
             self.client.update_collection(
                 collection_name=self.collection_name,
                 optimizer_config=rest.OptimizersConfigDiff(indexing_threshold=0),
@@ -95,7 +103,7 @@ class QdrantManager:
             hnsw_config=rest.HnswConfigDiff(m=16, ef_construct=100),
             optimizers_config=rest.OptimizersConfigDiff(indexing_threshold=0),
         )
-        print(f"Collection '{self.collection_name}' created successfully!")
+        logger.info(f"Collection '{self.collection_name}' created successfully!")
 
     def add_data(self) -> None:
         batch = []
@@ -112,20 +120,20 @@ class QdrantManager:
 
             if len(batch) >= self.batch_size:
                 self.client.upsert(collection_name=self.collection_name, points=batch)
-                print(f"Upserted batch of {len(batch)} points (up to ID {point_id - 1})")
+                logger.info(f"Upserted batch of {len(batch)} points (up to ID {point_id - 1})")
                 batch = []
 
         if batch:
             self.client.upsert(collection_name=self.collection_name, points=batch)
-            print(f"Upserted final batch of {len(batch)} points")
+            logger.info(f"Upserted final batch of {len(batch)} points")
 
-        print(f"Total {point_id} points inserted into '{self.collection_name}'.")
+        logger.info(f"Total {point_id} points inserted into '{self.collection_name}'.")
 
         self.client.update_collection(
             collection_name=self.collection_name,
             optimizer_config=rest.OptimizersConfigDiff(indexing_threshold=20000),
         )
-        print("Indexing re-enabled. Vectors will be searchable shortly.")
+        logger.info("Indexing re-enabled. Vectors will be searchable shortly.")
 
         return point_id
 

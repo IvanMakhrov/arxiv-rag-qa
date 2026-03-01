@@ -3,6 +3,11 @@ import json
 import boto3
 from sentence_transformers import SentenceTransformer
 
+from utils.setup_logger import setup_logger
+
+# Logging setup
+logger = setup_logger(__name__)
+
 
 def get_minio_client():
     return boto3.client("s3")
@@ -17,6 +22,7 @@ def generate_embeddings(bucket_name: str, chunk_dir: str, embedding_dir: str, mo
         response = s3_client.get_object(Bucket=bucket_name, Key=chunk_dir)
         chunk_data = response["Body"].read().decode("utf-8")
     except Exception as e:
+        logger.error(f"Chunk file not found in s3://{bucket_name}/{chunk_dir}: {e}")
         raise Exception(f"Chunk file not found in s3://{bucket_name}/{chunk_dir}: {e}") from e
 
     texts = []
@@ -28,9 +34,10 @@ def generate_embeddings(bucket_name: str, chunk_dir: str, embedding_dir: str, mo
             texts.append(record["text"])
 
     if not texts:
-        raise ValueError("No chunks found for embedding!")
+        logger.error("No chunks found for embedding")
+        raise ValueError("No chunks found for embedding")
 
-    print(f"Generating embeddings for {len(texts)} chunks using {model_name}")
+    logger.info(f"Generating embeddings for {len(texts)} chunks using {model_name}")
     model = SentenceTransformer(model_name)
     embeddings = model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
 
@@ -47,6 +54,6 @@ def generate_embeddings(bucket_name: str, chunk_dir: str, embedding_dir: str, mo
         ContentType="application/jsonl",
     )
 
-    print(f"Saved embeddings to s3://{bucket_name}/{embedding_dir}")
+    logger.info(f"Saved embeddings to s3://{bucket_name}/{embedding_dir}")
 
     return len(embeddings)
