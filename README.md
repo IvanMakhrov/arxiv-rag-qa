@@ -81,8 +81,8 @@ docker compose up
 - Очередь задач: Celery
 - Мониторинг: Grafana
 - Real-time метрики: Prometheus
-- Promtail: Сбор логов
-- Loki: Хранение логов
+- Сбор логов: Promtail
+- Хранение логов: Loki
 
 ## UI:
 
