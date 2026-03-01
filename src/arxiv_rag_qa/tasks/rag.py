@@ -25,7 +25,8 @@ def get_rag_response_task(self, request_data):
         )
 
         result_data = {
-            "response": response,
+            "answer": response,
+            "sources": [],
             "emb_model_name": request_data["emb_model_name"],
             "collection_name": request_data["collection_name"],
             "top_k": request_data["top_k"],
@@ -37,7 +38,7 @@ def get_rag_response_task(self, request_data):
             task_id,
             status="completed",
             completed_at=datetime.utcnow(),
-            result_data=json.dumps(result_data),
+            result=json.dumps(result_data),
             progress=100,
         )
 

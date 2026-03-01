@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статус задачи • RAG QA</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    {% if refresh_seconds > 0 %}
+    <!-- Авто-обновление страницы без JavaScript -->
+    <meta http-equiv="refresh" content="{{ refresh_seconds }}">
+    {% endif %}
+    <style>
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-processing { background: #cce5ff; color: #004085; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .result-section { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Статус задачи</h1>
+            <p>ID: <code>{{ task_id }}</code></p>
+        </header>
+
+        <main>
+            <!-- Блок статуса -->
+            <section class="status-card">
+                <div class="status-header">
+                    {% if task.status == "processing" %}
+                        <span class="spinner"></span>
+                    {% endif %}
+                    <span class="status-badge status-{{ task.status }}">
+                        {{ task.status }}
+                    </span>
+                </div>
+
+                <p><strong>Запрос:</strong> {{ query }}</p>
+                <p><strong>Тип задачи:</strong> {{ task.task_type }}</p>
+                <p><strong>Создана:</strong> {{ task.created_at.strftime('%H:%M:%S %d.%m.%Y') }}</p>
+                {% if task.updated_at %}
+                <p><strong>Обновлена:</strong> {{ task.updated_at.strftime('%H:%M:%S %d.%m.%Y') }}</p>
+                {% endif %}
+
+                {% if task.status == "failed" and task.error %}
+                <div class="error-box">
+                    <strong>Ошибка:</strong>
+                    <pre>{{ task.error }}</pre>
+                </div>
+                {% endif %}
+            </section>
+
+            <!-- Результат (только при completed) -->
+            {% if task.status == "completed" and result %}
+            <section class="response-section result-section">
+                <h2>📄 Ответ:</h2>
+                <div class="response-content">
+                    <p>{{ result.answer }}</p>
+                </div>
+
+                {% if result.sources and result.sources|length > 0 %}
+                <details class="sources" open>
+                    <summary>📚 Источники ({{ result.sources|length }})</summary>
+                    <ul>
+                    {% for source in result.sources %}
+                        <li>
+                            <strong>{{ source.title or source.get('title', 'Без названия') }}</strong><br>
+                            <small>{{ source.authors or source.get('authors', 'Unknown') }} ({{ source.year or source.get('year', '?') }})</small><br>
+                            <a href="{{ source.url or source.get('url', '#') }}" target="_blank" rel="noopener">
+                                {{ source.url or source.get('url', '#') }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                </details>
+                {% endif %}
+
+                <div class="actions">
+                    <a href="/" class="btn-secondary">← Новый запрос</a>
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- Кнопки управления -->
+            <div class="actions">
+                {% if task.status in ["pending", "processing"] %}
+                    <p class="hint">⏳ Страница обновится автоматически...</p>
+                    <a href="/task/{{ task_id }}" class="btn-secondary">Обновить вручную</a>
+                {% endif %}
+                <a href="/" class="btn-secondary">← На главную</a>
+            </div>
+        </main>
+
+        <footer>
+            <p>RAG System • Async processing via Celery</p>
+        </footer>
+    </div>
+</body>
+</html>

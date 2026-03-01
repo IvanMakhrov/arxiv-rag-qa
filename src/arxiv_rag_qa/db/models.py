@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -18,6 +18,10 @@ class TaskStatus(Base):
     error_message = Column(Text)
     result_data = Column(Text)  # JSON string with task results
     progress = Column(Integer, default=0)  # 0-100
+    query = Column(Text, nullable=True)
+    result = Column(JSON, nullable=True)
+    error = Column(Text, nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
 
     def to_dict(self):
         return {
@@ -30,4 +34,8 @@ class TaskStatus(Base):
             "error_message": self.error_message,
             "progress": self.progress,
             "result_data": self.result_data,
+            "query": self.query,
+            "result": self.result,
+            "error": self.error,
+            "metadata": self.metadata_,
         }

@@ -1,8 +1,12 @@
+import json
 import os
 import uuid
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
@@ -21,7 +25,6 @@ from arxiv_rag_qa.api.eval_model import (
 )
 from arxiv_rag_qa.api.middleware import LatencyMiddleware
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest
-from arxiv_rag_qa.api.rag_model import RagRequest
 from arxiv_rag_qa.celery_config import celery_app
 from arxiv_rag_qa.db.models import Base, TaskStatus
 from utils.setup_logger import setup_logger
@@ -37,9 +40,128 @@ SessionLocal = sessionmaker(bind=engine)
 # Создание таблиц
 Base.metadata.create_all(bind=engine)
 
+# Production settings
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
 # FastAPI setup
-app = FastAPI(title="RAG Service with Async Tasks")
+app = FastAPI(
+    title="RAG Service with Async Tasks",
+    debug=DEBUG,
+    docs_url=None if not DEBUG else "/docs",  # Disable Swagger in production
+    redoc_url=None if not DEBUG else "/redoc",
+)
 app.add_middleware(LatencyMiddleware)
+
+# Mount static files (nginx will handle this, but keep for local dev)
+if DEBUG:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+templates = Jinja2Templates(directory="static")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    """Serve main page"""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.post("/get-response", response_class=HTMLResponse)
+async def get_rag_response(
+    request: Request,
+    query: str = Form(..., min_length=1, max_length=2000),
+    top_k: int = Form(5, ge=1, le=50),
+    emb_model_name: str = Form("all-MiniLM-L6-v2"),
+    collection_name: str = Form("arxiv_rag"),
+    gen_model_name: str = Form("Qwen/Qwen2.5-0.5B-Instruct"),
+    qdrant_host: str = Form("qdrant"),
+    qdrant_port: int = Form(6333),
+):
+    """
+    Асинхронный RAG-запрос через HTML-форму.
+    Принимает form-data (без JS), отправляет задачу в Celery,
+    перенаправляет на страницу статуса meta-refresh.
+    """
+    try:
+        task_id = str(uuid.uuid4())
+
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id,
+            task_type="get_rag_response",
+            status="pending",
+            created_at=datetime.utcnow(),
+            query=query,
+        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "emb_model_name": emb_model_name,
+            "collection_name": collection_name,
+            "top_k": top_k,
+            "gen_model_name": gen_model_name,
+            "query": query,
+            "qdrant_host": qdrant_host,
+            "qdrant_port": qdrant_port,
+        }
+
+        celery_app.send_task("get_rag_response", args=[task_data], task_id=task_id)
+
+        logger.info(f"RAG query task queued: {task_id}, query: {query[:100]}...")
+
+        return RedirectResponse(url=f"/task/{task_id}", status_code=303)
+
+    except Exception as e:
+        logger.error(f"Failed to queue RAG query task: {e}")
+        return templates.TemplateResponse(
+            "index.html",
+            {"request": request, "error": f"Ошибка обработки запроса: {e!s}", "query": query},
+        )
+
+
+@app.get("/task/{task_id}", response_class=HTMLResponse)
+async def task_status_page(request: Request, task_id: str):
+    try:
+        db = SessionLocal()
+        task = db.query(TaskStatus).filter(TaskStatus.id == task_id).first()
+        db.close()
+
+        if not task:
+            raise HTTPException(status_code=404, detail="Задача не найдена")
+
+        refresh_seconds = 3 if task.status in ["pending", "processing"] else 0
+
+        result = None
+        if task.status == "completed" and task.result:
+            try:
+                result = json.loads(task.result) if isinstance(task.result, str) else task.result
+            except Exception:
+                result = {"answer": task.result, "sources": []}
+
+        return templates.TemplateResponse(
+            "task_status.html",
+            {
+                "request": request,
+                "task_id": task_id,
+                "task": task,
+                "result": result,
+                "refresh_seconds": refresh_seconds,
+                "query": task.query,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to render task status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки статуса: {e!s}") from e
+
+
+@app.get("/health")
+async def health_check():
+    """Health endpoint for nginx/Docker"""
+    return {"status": "healthy", "service": "rag-service"}
 
 
 @app.post("/download-papers", response_model=dict)
@@ -343,43 +465,6 @@ async def eval_generator(request: GeneratorEvalRequest):
 
     except Exception as e:
         logger.error(f"Failed to queue generator evaluation task: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@app.post("/get-response", response_model=dict)
-async def get_rag_response(request: RagRequest):
-    """Асинхронный RAG запрос - возвращает ID задачи"""
-    try:
-        task_id = str(uuid.uuid4())
-        db = SessionLocal()
-        task = TaskStatus(
-            id=task_id, task_type="get_rag_response", status="pending", created_at=datetime.utcnow()
-        )
-        db.add(task)
-        db.commit()
-        db.close()
-
-        task_data = {
-            "emb_model_name": request.emb_model_name,
-            "collection_name": request.collection_name,
-            "top_k": request.top_k,
-            "gen_model_name": request.gen_model_name,
-            "query": request.query,
-            "qdrant_host": request.qdrant_host,
-            "qdrant_port": request.qdrant_port,
-        }
-
-        celery_app.send_task("get_rag_response", args=[task_data], task_id=task_id)
-        logger.info("Query processed successfully")
-
-        return {
-            "task_id": task_id,
-            "status": "pending",
-            "message": "RAG query task queued successfully",
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to queue RAG query task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
