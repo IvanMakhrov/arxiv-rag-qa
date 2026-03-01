@@ -93,6 +93,7 @@ docker compose up
 - Qdrant: http://localhost:6333/dashboard
 - Grafana: http://localhost:3000
 - Prometheus: http://localhost:9090
+- RAG UI: http://localhost:80
 
 ## Routers:
 
