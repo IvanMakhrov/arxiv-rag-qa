@@ -111,5 +111,5 @@ docker compose up
 - DELETE - /tasks/{task_id} - Удаление задачи
 - GET - /tasks/stats - Статистика задач
 - GET - / - UI RAG системы
-- GET - /task/{task_id} - Получить статус задачи
+- GET - /task/{task_id} - Получить статус задачи в UI
 - GET - /health - Состояние api
