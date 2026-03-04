@@ -112,4 +112,4 @@ docker compose up
 - GET - /tasks/stats - Статистика задач
 - GET - / - UI RAG системы
 - GET - /task/{task_id} - Получить статус задачи
-- GET - /health - Состояние Api
+- GET - /health - Состояние api
