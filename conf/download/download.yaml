@@ -1,8 +1,0 @@
-pdf_dir: data/raw/pdf
-json_dir: data/raw/json
-metadata_dir: data/raw/metadata/metadata.json
-
-arxiv_category: cs.CL
-start_date: 202501010000
-target_paper_count: 10
-results_per_request: 5

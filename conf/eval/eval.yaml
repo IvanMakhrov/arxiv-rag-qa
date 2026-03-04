@@ -1,2 +1,2 @@
-test_data_dir: data/processed/test_questions.jsonl
-bertscore_model: roberta-base
+eval:
+  bertscore_model: roberta-base

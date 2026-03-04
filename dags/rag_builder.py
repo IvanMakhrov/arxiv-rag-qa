@@ -15,8 +15,8 @@ default_args = {
     "depends_on_past": False,
     "email_on_failure": False,
     "email_on_retry": False,
-    "retries": cfg.dag.retries,
-    "retry_delay": timedelta(minutes=cfg.dag.retry_delay),
+    "retries": cfg.infrastructure.dag.retries,
+    "retry_delay": timedelta(minutes=cfg.infrastructure.dag.retry_delay),
 }
 
 with DAG(
@@ -35,13 +35,13 @@ with DAG(
         op_kwargs={
             "endpoint": "/chunking",
             "payload": {
-                "bucket_name": cfg.minio.bucket_name,
-                "chunk_dir": cfg.chunking.chunk_dir,
-                "json_dir": cfg.download.json_dir,
-                "chunk_size": cfg.chunking.chunk_size,
-                "chunk_overlap": cfg.chunking.chunk_overlap,
+                "bucket_name": cfg.infrastructure.minio.bucket_name,
+                "chunk_dir": cfg.experiments.chunking.chunk_dir,
+                "json_dir": cfg.data.json_dir,
+                "chunk_size": cfg.experiments.chunking.chunk_size,
+                "chunk_overlap": cfg.experiments.chunking.chunk_overlap,
             },
-            "http_conn_id": cfg.dag.http_conn_id,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },
     )
 
@@ -50,8 +50,8 @@ with DAG(
         python_callable=wait_for_task,
         op_kwargs={
             "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_chunking', key='task_id') }}",
-            "http_conn_id": cfg.dag.http_conn_id,
-            "max_wait_time": cfg.dag.chunking_timeout,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+            "max_wait_time": cfg.infrastructure.dag.chunking_timeout,
             "poll_interval": 25,
         },
     )
@@ -61,7 +61,7 @@ with DAG(
         python_callable=log_task_to_mlflow,
         op_kwargs={
             "task_stage": "chunking",
-            "experiment_name": cfg.mlflow.experiment_name,
+            "experiment_name": cfg.experiments.mlflow.experiment_name,
         },
     )
 
@@ -72,12 +72,14 @@ with DAG(
         op_kwargs={
             "endpoint": "/embeddings",
             "payload": {
-                "bucket_name": cfg.minio.bucket_name,
-                "chunk_dir": cfg.chunking.chunk_dir,
-                "embedding_dir": cfg.embeddings.embedding_dir,
-                "model_name": cfg.embeddings.model_name,
+                "bucket_name": cfg.infrastructure.minio.bucket_name,
+                "chunk_dir": cfg.experiments.chunking.chunk_dir,
+                "embedding_dir": cfg.experiments.embeddings.embedding_dir,
+                "model_name": cfg.experiments.embeddings.model_name,
+                "batch_size": cfg.experiments.embeddings.batch_size,
+                "checkpoint_interval": cfg.experiments.embeddings.checkpoint_interval,
             },
-            "http_conn_id": cfg.dag.http_conn_id,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },
     )
 
@@ -87,8 +89,8 @@ with DAG(
         op_kwargs={
             "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_embeddings', "
             "key='task_id') }}",
-            "http_conn_id": cfg.dag.http_conn_id,
-            "max_wait_time": cfg.dag.embeddings_timeout,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+            "max_wait_time": cfg.infrastructure.dag.embeddings_timeout,
             "poll_interval": 45,
         },
     )
@@ -98,7 +100,7 @@ with DAG(
         python_callable=log_task_to_mlflow,
         op_kwargs={
             "task_stage": "embedding",
-            "experiment_name": cfg.mlflow.experiment_name,
+            "experiment_name": cfg.experiments.mlflow.experiment_name,
         },
     )
 
@@ -109,13 +111,13 @@ with DAG(
         op_kwargs={
             "endpoint": "/generate-test-data",
             "payload": {
-                "bucket_name": cfg.minio.bucket_name,
-                "chunk_dir": cfg.chunking.chunk_dir,
-                "test_data_dir": cfg.test_data.test_data_dir,
-                "metadata_dir": cfg.download.metadata_dir,
-                "test_data_size": cfg.test_data.test_data_size,
+                "bucket_name": cfg.infrastructure.minio.bucket_name,
+                "chunk_dir": cfg.experiments.chunking.chunk_dir,
+                "test_data_dir": cfg.experiments.test_data.test_data_dir,
+                "metadata_dir": cfg.data.metadata_dir,
+                "test_data_size": cfg.experiments.test_data.test_data_size,
             },
-            "http_conn_id": cfg.dag.http_conn_id,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },
     )
 
@@ -124,8 +126,8 @@ with DAG(
         python_callable=wait_for_task,
         op_kwargs={
             "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_test_data', key='task_id') }}",
-            "http_conn_id": cfg.dag.http_conn_id,
-            "max_wait_time": cfg.dag.test_data_timeout,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+            "max_wait_time": cfg.infrastructure.dag.test_data_timeout,
             "poll_interval": 15,
         },
     )
@@ -135,7 +137,47 @@ with DAG(
         python_callable=log_task_to_mlflow,
         op_kwargs={
             "task_stage": "generate_test_data",
-            "experiment_name": cfg.mlflow.experiment_name,
+            "experiment_name": cfg.experiments.mlflow.experiment_name,
+        },
+    )
+
+    # ============ QDRANT ============
+    trigger_qdrant = PythonOperator(
+        task_id="trigger_qdrant",
+        python_callable=trigger_task,
+        op_kwargs={
+            "endpoint": "/qdrant-setup",
+            "payload": {
+                "host": cfg.experiments.qdrant.host,
+                "port": cfg.experiments.qdrant.port,
+                "collection_name": cfg.experiments.qdrant.collection_name,
+                "vector_size": cfg.experiments.qdrant.vector_size,
+                "bucket_name": cfg.infrastructure.minio.bucket_name,
+                "embedding_dir": cfg.experiments.embeddings.embedding_dir,
+                "timeout": cfg.experiments.qdrant.timeout,
+                "batch_size": cfg.experiments.qdrant.batch_size,
+            },
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+        },
+    )
+
+    wait_qdrant = PythonOperator(
+        task_id="wait_qdrant",
+        python_callable=wait_for_task,
+        op_kwargs={
+            "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_qdrant', key='task_id') }}",
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+            "max_wait_time": cfg.infrastructure.dag.qdrant_timeout,
+            "poll_interval": 30,
+        },
+    )
+
+    log_qdrant = PythonOperator(
+        task_id="log_qdrant",
+        python_callable=log_task_to_mlflow,
+        op_kwargs={
+            "task_stage": "setup_qdrant",
+            "experiment_name": cfg.experiments.mlflow.experiment_name,
         },
     )
 
@@ -150,4 +192,7 @@ with DAG(
         >> trigger_test_data
         >> wait_test_data
         >> log_test_data
+        >> trigger_qdrant
+        >> wait_qdrant
+        >> log_qdrant
     )

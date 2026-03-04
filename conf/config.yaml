@@ -1,14 +1,6 @@
 defaults:
-  - download: download
-  - chunking: chunking
-  - embeddings: embeddings
-  - dag: dag
-  - qdrant_setup: qdrant_setup
-  - generator: generator
-  - retriever: retriever
-  - test_data: test_data
-  - qdrant: qdrant
-  - minio: minio
-  - mlflow: mlflow
+  - data: download
+  - experiments: baseline
   - eval: eval
+  - infrastructure: infrastructure
   - _self_

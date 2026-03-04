@@ -1,41 +1,77 @@
-<!-- Форма отправки RAG-запроса (POST → /get-response) -->
-<form method="POST" action="/get-response" class="query-form">
-    <div class="input-group">
-        <label for="query">Ваш вопрос:</label>
-        <textarea
-            id="query"
-            name="query"
-            rows="4"
-            placeholder="Например: What are the main methods for document chunking in RAG systems?"
-            required
-            maxlength="2000"
-        >{{ query if query else '' }}</textarea>
-        {% if error %}
-            <p class="error-msg">{{ error }}</p>
-        {% endif %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 ArXiv RAG QA</title>
+
+    <!-- ✅ Подключение CSS -->
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 ArXiv RAG QA</h1>
+            <p>Задайте вопрос по научным статьям</p>
+        </header>
+
+        <main>
+            <!-- Форма отправки запроса -->
+            <form method="POST" action="/get-response" class="query-form">
+                <div class="input-group">
+                    <label for="query">Ваш вопрос:</label>
+                    <textarea
+                        id="query"
+                        name="query"
+                        rows="4"
+                        placeholder="Например: What are the main methods for document chunking in RAG systems?"
+                        required
+                        maxlength="2000"
+                    >{{ query if query else '' }}</textarea>
+                    {% if error %}
+                        <p class="error-msg">{{ error }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="form-options">
+                    <label>
+                        <input type="checkbox" name="use_hybrid" value="on" {% if not query or use_hybrid %}checked{% endif %}>
+                        Использовать гибридный ретривер
+                    </label>
+                    <label>
+                        Top-K:
+                        <select name="top_k">
+                            <option value="3" {% if top_k == 3 %}selected{% endif %}>3</option>
+                            <option value="5" {% if not top_k or top_k == 5 %}selected{% endif %}>5</option>
+                            <option value="10" {% if top_k == 10 %}selected{% endif %}>10</option>
+                        </select>
+                    </label>
+                </div>
+
+                <!-- Скрытые поля конфигурации -->
+                <input type="hidden" name="emb_model_name" value="sentence-transformers/all-MiniLM-L6-v2">
+                <input type="hidden" name="collection_name" value="arxiv_rag">
+                <input type="hidden" name="gen_model_name" value="Qwen/Qwen2.5-0.5B-Instruct">
+                <input type="hidden" name="qdrant_host" value="qdrant">
+                <input type="hidden" name="qdrant_port" value="6333">
+
+                <button type="submit" class="send-btn">🔍 Отправить запрос</button>
+            </form>
+
+            <!-- Блок ответа (если есть) -->
+            {% if response %}
+            <section class="response-section">
+                <h2>📄 Ответ:</h2>
+                <div class="response-content">
+                    <p>{{ response.answer or response.response }}</p>
+                </div>
+            </section>
+            {% endif %}
+        </main>
+
+        <footer>
+            <p>RAG System • Powered by FastAPI + nginx</p>
+        </footer>
     </div>
-
-    <div class="form-options">
-        <label>
-            <input type="checkbox" name="use_hybrid" value="on" {% if not query or use_hybrid %}checked{% endif %}>
-            Использовать гибридный ретривер
-        </label>
-        <label>
-            Top-K:
-            <select name="top_k">
-                <option value="3" {% if top_k == 3 %}selected{% endif %}>3</option>
-                <option value="5" {% if not top_k or top_k == 5 %}selected{% endif %}>5</option>
-                <option value="10" {% if top_k == 10 %}selected{% endif %}>10</option>
-            </select>
-        </label>
-    </div>
-
-    <!-- Скрытые поля для конфигурации (можно вынести в settings) -->
-    <input type="hidden" name="emb_model_name" value="sentence-transformers/all-MiniLM-L6-v2">
-    <input type="hidden" name="collection_name" value="arxiv_rag">
-    <input type="hidden" name="gen_model_name" value="Qwen/Qwen2.5-0.5B-Instruct">
-    <input type="hidden" name="qdrant_host" value="qdrant">
-    <input type="hidden" name="qdrant_port" value="6333">
-
-    <button type="submit" class="send-btn">🔍 Отправить запрос</button>
-</form>
+</body>
+</html>

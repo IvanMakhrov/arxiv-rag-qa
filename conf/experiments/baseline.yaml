@@ -1,0 +1,32 @@
+mlflow:
+  experiment_name: baseline
+
+chunking:
+  chunk_size: 512
+  chunk_overlap: 50
+  chunk_dir: ${experiments.mlflow.experiment_name}/chunking.jsonl
+
+embeddings:
+  embedding_dir: ${experiments.mlflow.experiment_name}/embeddings.jsonl
+  model_name: all-MiniLM-L6-v2
+  batch_size: 100
+  checkpoint_interval: 10
+
+test_data:
+  test_data_dir: ${experiments.mlflow.experiment_name}/test_data.jsonl
+  test_data_size: 10
+
+qdrant:
+  host: qdrant
+  port: 6333
+  collection_name: ${experiments.mlflow.experiment_name}
+  vector_size: 384
+  timeout: 60
+  batch_size: 8192
+
+generator:
+  model_name: Qwen/Qwen2.5-0.5B-Instruct
+  max_new_tokens: 256
+
+retriever:
+  top_k: 5

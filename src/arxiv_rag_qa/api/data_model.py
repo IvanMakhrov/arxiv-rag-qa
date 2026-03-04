@@ -62,6 +62,8 @@ class EmbeddingsRequest(BaseModel):
     chunk_dir: str
     embedding_dir: str
     model_name: str
+    batch_size: int
+    checkpoint_interval: int
 
 
 class EmbeddingsResponse(BaseModel):

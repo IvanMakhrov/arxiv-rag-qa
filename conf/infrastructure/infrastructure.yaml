@@ -1,0 +1,16 @@
+dag:
+  http_conn_id: rag_service
+  response_check: 200
+  retries: 1
+  retry_delay: 1
+  download_timeout: 36000
+  parse_timeout: 36000
+  chunking_timeout: 36000
+  embeddings_timeout: 86400
+  test_data_timeout: 36000
+  qdrant_timeout: 36000
+  retriever_eval_timeout: 86400
+  generator_eval_timeout: 86400
+
+minio:
+  bucket_name: rag-data

@@ -1,4 +1,0 @@
-chunk_size: 512
-chunk_overlap: 50
-
-chunk_dir: data/processed/chunks_${.chunk_size}_overlap_${.chunk_overlap}.jsonl

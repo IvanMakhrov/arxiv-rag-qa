@@ -19,6 +19,8 @@ def create_embeddings_task(self, request_data):
             chunk_dir=request_data["chunk_dir"],
             embedding_dir=request_data["embedding_dir"],
             model_name=request_data["model_name"],
+            batch_size=request_data["batch_size"],
+            checkpoint_interval=request_data["checkpoint_interval"],
         )
 
         result_data = {
@@ -27,6 +29,8 @@ def create_embeddings_task(self, request_data):
             "model_name": request_data["model_name"],
             "chunk_dir": request_data["chunk_dir"],
             "embedding_dir": request_data["embedding_dir"],
+            "batch_size": request_data["batch_size"],
+            "checkpoint_interval": request_data["checkpoint_interval"],
         }
 
         self.update_task_status(

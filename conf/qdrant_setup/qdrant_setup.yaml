@@ -1,4 +1,0 @@
-host: qdrant
-port: 6333
-collection_name: arxiv_rag
-vector_size: 384

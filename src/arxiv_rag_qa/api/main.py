@@ -293,6 +293,8 @@ async def create_embeddings(request: EmbeddingsRequest):
             "chunk_dir": request.chunk_dir,
             "embedding_dir": request.embedding_dir,
             "model_name": request.model_name,
+            "batch_size": request.batch_size,
+            "checkpoint_interval": request.checkpoint_interval,
         }
 
         celery_app.send_task("create_embeddings", args=[task_data], task_id=task_id)

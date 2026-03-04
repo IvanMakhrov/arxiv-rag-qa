@@ -15,8 +15,8 @@ default_args = {
     "depends_on_past": False,
     "email_on_failure": False,
     "email_on_retry": False,
-    "retries": cfg.dag.retries,
-    "retry_delay": timedelta(minutes=cfg.dag.retry_delay),
+    "retries": cfg.infrastructure.dag.retries,
+    "retry_delay": timedelta(minutes=cfg.infrastructure.dag.retry_delay),
 }
 
 with DAG(
@@ -35,15 +35,15 @@ with DAG(
         op_kwargs={
             "endpoint": "/download-papers",
             "payload": {
-                "category": cfg.download.arxiv_category,
-                "start_date": str(cfg.download.start_date),
-                "target_count": cfg.download.target_paper_count,
-                "results_per_request": cfg.download.results_per_request,
-                "bucket_name": cfg.minio.bucket_name,
-                "pdf_dir": cfg.download.pdf_dir,
-                "metadata_dir": cfg.download.metadata_dir,
+                "category": cfg.data.arxiv_category,
+                "start_date": str(cfg.data.start_date),
+                "target_count": cfg.data.target_paper_count,
+                "results_per_request": cfg.data.results_per_request,
+                "bucket_name": cfg.infrastructure.minio.bucket_name,
+                "pdf_dir": cfg.data.pdf_dir,
+                "metadata_dir": cfg.data.metadata_dir,
             },
-            "http_conn_id": cfg.dag.http_conn_id,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },
     )
 
@@ -52,8 +52,8 @@ with DAG(
         python_callable=wait_for_task,
         op_kwargs={
             "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_download', key='task_id') }}",
-            "http_conn_id": cfg.dag.http_conn_id,
-            "max_wait_time": cfg.dag.download_timeout,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+            "max_wait_time": cfg.infrastructure.dag.download_timeout,
             "poll_interval": 30,
         },
     )
@@ -63,7 +63,7 @@ with DAG(
         python_callable=log_task_to_mlflow,
         op_kwargs={
             "task_stage": "download",
-            "experiment_name": cfg.mlflow.experiment_name,
+            "experiment_name": "download_data",
         },
     )
 
@@ -74,11 +74,11 @@ with DAG(
         op_kwargs={
             "endpoint": "/parse-pdf",
             "payload": {
-                "bucket_name": cfg.minio.bucket_name,
-                "metadata_dir": cfg.download.metadata_dir,
-                "json_dir": cfg.download.json_dir,
+                "bucket_name": cfg.infrastructure.minio.bucket_name,
+                "metadata_dir": cfg.data.metadata_dir,
+                "json_dir": cfg.data.json_dir,
             },
-            "http_conn_id": cfg.dag.http_conn_id,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },
     )
 
@@ -87,8 +87,8 @@ with DAG(
         python_callable=wait_for_task,
         op_kwargs={
             "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_parse', key='task_id') }}",
-            "http_conn_id": cfg.dag.http_conn_id,
-            "max_wait_time": cfg.dag.parse_timeout,
+            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+            "max_wait_time": cfg.infrastructure.dag.parse_timeout,
             "poll_interval": 20,
         },
     )
@@ -98,7 +98,7 @@ with DAG(
         python_callable=log_task_to_mlflow,
         op_kwargs={
             "task_stage": "parse",
-            "experiment_name": cfg.mlflow.experiment_name,
+            "experiment_name": "download_data",
         },
     )
 

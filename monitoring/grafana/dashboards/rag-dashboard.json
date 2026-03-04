@@ -1,10 +1,24 @@
 {
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -14,7 +28,7 @@
         "uid": "Loki"
       },
       "gridPos": {
-        "h": 3,
+        "h": 2,
         "w": 24,
         "x": 0,
         "y": 0
@@ -26,17 +40,390 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "## 🪵 RAG Service & Celery Worker Logs\n\n**Filters**: Use variables above to filter by service, log level, container.\n\n**Tips**:\n- Click on a log line to expand details\n- Use `| json` parser if logs are JSON-formatted\n- Pattern: `{service=~\"$service\", level=~\"$level\"} |~ \"$search\"`",
-        "mode": "markdown"
+        "content": "<div style=\"text-align: center; font-size: 32px; font-weight: bold;\">\nRAG Service & Celery Worker Logs\n</div>\n",
+        "mode": "html"
       },
       "pluginVersion": "10.1.5",
-      "title": "📋 Dashboard Guide",
       "type": "text"
     },
     {
       "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 2
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "Loki",
+            "uid": "Loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(\n  count_over_time(\n    {service=~\"$service\", container=~\"$container\"}\n    | json\n    | __error__=\"\"\n    | levelname=\"ERROR\"\n    [$__range]\n  )\n) or vector(0)",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "🔴 Total Errors",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 4,
+        "y": 2
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "Loki",
+            "uid": "Loki"
+          },
+          "editorMode": "code",
+          "expr": "sum(\n  count_over_time(\n    {service=~\"$service\", container=~\"$container\"}\n    | json\n    | __error__=\"\"\n    | levelname=\"WARNING\"\n    [$__range]\n  )\n) or vector(0)",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "🟡 Total Warnings",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 8,
+        "y": 2
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(celery_task_succeeded_total) or vector(0)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "✅ Celery Tasks Success",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 12,
+        "y": 2
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(celery_task_failed_total) or vector(0)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "❌ Celery Tasks Failed",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 16,
+        "y": 2
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "(\n  (sum(celery_task_sent_total) or vector(0))\n  - \n  (sum(celery_task_succeeded_total) or vector(0))\n  - \n  (sum(celery_task_failed_total) or vector(0))\n  - \n  (sum(celery_task_revoked_total) or vector(0))\n)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "⚡ Celery Tasks Active",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 20,
+        "y": 2
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.1.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(celery_queue_length) or vector(0)",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "🗂️ Celery Tasks Queue",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -57,6 +444,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -136,7 +524,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 3
+        "y": 5
       },
       "id": 2,
       "options": {
@@ -157,8 +545,10 @@
             "type": "Loki",
             "uid": "Loki"
           },
-          "expr": "sum by (level) (rate({service=~\"$service\", container=~\"$container\"} | logfmt | level=~\"$level\" |~ \"$search\" [$__interval]))",
+          "editorMode": "code",
+          "expr": "sum by (levelname) (\n  count_over_time(\n    {service=~\"$service\", container=~\"$container\"}\n    | json\n    | __error__=\"\"\n    |~ \"$search\"\n    [$__range]\n  )\n)",
           "legendFormat": "{{level}}",
+          "queryType": "range",
           "refId": "A"
         }
       ],
@@ -167,8 +557,8 @@
     },
     {
       "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -189,6 +579,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -215,13 +606,14 @@
               }
             ]
           }
-        }
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 3
+        "y": 5
       },
       "id": 3,
       "options": {
@@ -242,8 +634,10 @@
             "type": "Loki",
             "uid": "Loki"
           },
-          "expr": "sum by (service) (rate({service=~\"$service\", container=~\"$container\"} | logfmt | level=~\"$level\" |~ \"$search\" [$__interval]))",
+          "editorMode": "code",
+          "expr": "sum by (service) (\n  count_over_time(\n    {service=~\"$service\", container=~\"$container\"}\n    | json\n    | __error__=\"\"\n    |~ \"$search\"\n    [$__range]\n  )\n)",
           "legendFormat": "{{service}}",
+          "queryType": "range",
           "refId": "A"
         }
       ],
@@ -252,385 +646,8 @@
     },
     {
       "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 11
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.1.5",
-      "targets": [
-        {
-          "datasource": {
-            "type": "Loki",
-            "uid": "Loki"
-          },
-          "expr": "sum(count_over_time({service=~\"$service\", container=~\"$container\"} | logfmt | level=\"error\" |~ \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "🔴 Total Errors",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "blue",
-                "value": null
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 11
-      },
-      "id": 5,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.1.5",
-      "targets": [
-        {
-          "datasource": {
-            "type": "Loki",
-            "uid": "Loki"
-          },
-          "expr": "sum(count_over_time({service=~\"$service\", container=~\"$container\"} | logfmt | level=\"warning\" |~ \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "🟡 Total Warnings",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 11
-      },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.1.5",
-      "targets": [
-        {
-          "datasource": {
-            "type": "Loki",
-            "uid": "Loki"
-          },
-          "expr": "sum(count_over_time({service=\"celery-worker\", container=~\"$container\"} | logfmt | task_state=\"SUCCESS\" |~ \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "✅ Celery Tasks Success",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 11
-      },
-      "id": 7,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.1.5",
-      "targets": [
-        {
-          "datasource": {
-            "type": "Loki",
-            "uid": "Loki"
-          },
-          "expr": "sum(count_over_time({service=\"celery-worker\", container=~\"$container\"} | logfmt | task_state=\"FAILURE\" |~ \"$search\" [$__range]))",
-          "refId": "A"
-        }
-      ],
-      "title": "❌ Celery Tasks Failed",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 15
-      },
-      "id": 8,
-      "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": true,
-        "showLabels": true,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": true
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "Loki",
-            "uid": "Loki"
-          },
-          "expr": "{service=~\"$service\", container=~\"$container\"} | logfmt | level=~\"$level\" |~ \"$search\" | line_format \"{{.ts}} [{{.level}}] {{.service}}: {{.msg}} {{if .latency_ms}}({{.latency_ms}}ms){{end}}\"",
-          "refId": "A"
-        }
-      ],
-      "title": "📋 Live Log Stream",
-      "type": "logs"
-    },
-    {
-      "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Time"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 150
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "level"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "options": {
-                      "error": {
-                        "color": "red",
-                        "index": 0
-                      },
-                      "warning": {
-                        "color": "yellow",
-                        "index": 1
-                      },
-                      "info": {
-                        "color": "blue",
-                        "index": 2
-                      }
-                    },
-                    "type": "value"
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 25
-      },
-      "id": 9,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": ["sum"],
-          "show": false
-        },
-        "showHeader": true
-      },
-      "pluginVersion": "10.1.5",
-      "targets": [
-        {
-          "datasource": {
-            "type": "Loki",
-            "uid": "Loki"
-          },
-          "expr": "{service=~\"$service\", container=~\"$container\"} | logfmt | level=~\"$level\" |~ \"$search\" | unwrap msg | line_format \"{{json .}}\"",
-          "format": "table",
-          "refId": "A"
-        }
-      ],
-      "title": "📊 Structured Log Table",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -651,6 +668,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 4,
@@ -683,14 +701,14 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 33
+        "y": 13
       },
       "id": 10,
       "options": {
         "legend": {
-          "calcs": ["mean", "max", "p95"],
+          "calcs": ["mean", "max"],
           "displayMode": "table",
           "placement": "right",
           "showLegend": true
@@ -706,8 +724,10 @@
             "type": "Loki",
             "uid": "Loki"
           },
-          "expr": "quantile_over_time(0.95, {service=\"rag-service\"} | logfmt | latency_ms != \"\" | unwrap latency_ms |__error__=\"\" [$__interval]) by (endpoint)",
+          "editorMode": "code",
+          "expr": "quantile_over_time(0.95, \n  {service=~\"$service\", container=~\"$container\"}\n  | json\n  | __error__=\"\"\n  | latency_ms != \"\"\n  | unwrap latency_ms\n  [$__interval]\n) by (endpoint)",
           "legendFormat": "P95 {{endpoint}}",
+          "queryType": "range",
           "refId": "A"
         }
       ],
@@ -716,8 +736,8 @@
     },
     {
       "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
       },
       "fieldConfig": {
         "defaults": {
@@ -738,6 +758,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -759,8 +780,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -769,9 +789,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 33
+        "w": 24,
+        "x": 0,
+        "y": 21
       },
       "id": 11,
       "options": {
@@ -792,8 +812,10 @@
             "type": "Loki",
             "uid": "Loki"
           },
-          "expr": "sum by (task_name) (rate({service=\"celery-worker\"} | logfmt | task_state=\"SUCCESS\" |~ \"$search\" [$__interval]))",
+          "editorMode": "code",
+          "expr": "sum by (endpoint) (\n  rate(\n    {service=~\"$service\", container=~\"$container\"}\n    | json\n    | __error__=\"\"\n    | latency_ms != \"\"\n    [$__interval]\n  )\n)",
           "legendFormat": "{{task_name}}",
+          "queryType": "range",
           "refId": "A"
         }
       ],
@@ -802,31 +824,43 @@
     },
     {
       "datasource": {
-        "type": "Loki",
-        "uid": "Loki"
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
       },
       "gridPos": {
-        "h": 6,
+        "h": 10,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 29
       },
-      "id": 12,
+      "id": 8,
       "options": {
-        "code": {
-          "language": "logql",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "## 🔍 Useful LogQL Queries\n\n```logql\n# All errors from rag-service\n{service=\"rag-service\"} | logfmt | level=\"error\"\n\n# Slow queries (>1000ms)\n{service=\"rag-service\"} | logfmt | latency_ms > 1000\n\n# Celery task failures with traceback\n{service=\"celery-worker\"} | logfmt | task_state=\"FAILURE\" |~ \"traceback|exception\"\n\n# Search by specific error type\n{service=~\"rag-service|celery-worker\"} | logfmt | error_type=\"ConnectionError\"\n\n# Count logs per minute by level\nsum by (level) (rate({service=~\"$service\"} | logfmt [$__interval]))\n\n# Extract and graph latency\n{service=\"rag-service\"} | logfmt | latency_ms != \"\" | unwrap latency_ms\n```\n\n💡 **Pro Tip**: Use `| json` instead of `| logfmt` if your logs are JSON-formatted!",
-        "mode": "markdown"
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": true,
+        "showLabels": false,
+        "showTime": false,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
       },
-      "pluginVersion": "10.1.5",
-      "title": "🧰 LogQL Query Cookbook",
-      "type": "text"
+      "targets": [
+        {
+          "datasource": {
+            "type": "Loki",
+            "uid": "Loki"
+          },
+          "editorMode": "code",
+          "expr": "{service=~\"$service\", container=~\"$container\"}\n| json\n| __error__=\"\"\n| label_format level=levelname\n| level=~\"$level\"\n|~ \"$search\"\n| line_format `{{.asctime}} [{{.level}}] {{.name}}: {{.message}}`",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "📋 Live Log Stream",
+      "type": "logs"
     }
   ],
-  "refresh": "10s",
+  "refresh": false,
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["rag", "logs", "loki", "celery"],
@@ -883,26 +917,54 @@
       {
         "current": {
           "selected": true,
-          "text": ["error", "warning", "info"],
-          "value": ["error", "warning", "info"]
+          "text": ["All"],
+          "value": ["All"]
         },
-        "datasource": {
-          "type": "Loki",
-          "uid": "Loki"
-        },
-        "definition": "label_values(level)",
         "hide": 0,
         "includeAll": true,
-        "label": "Log Level",
         "multi": true,
         "name": "level",
-        "options": [],
-        "query": "label_values(level)",
-        "refresh": 1,
-        "regex": "",
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "All",
+            "value": "All"
+          },
+          {
+            "selected": false,
+            "text": "DEBUG",
+            "value": "DEBUG"
+          },
+          {
+            "selected": false,
+            "text": "INFO",
+            "value": "INFO"
+          },
+          {
+            "selected": false,
+            "text": "WARNING",
+            "value": "WARNING"
+          },
+          {
+            "selected": false,
+            "text": "ERROR",
+            "value": "ERROR"
+          },
+          {
+            "selected": false,
+            "text": "CRITICAL",
+            "value": "CRITICAL"
+          }
+        ],
+        "query": "All,DEBUG,INFO,WARNING,ERROR,CRITICAL",
+        "queryValue": "",
         "skipUrlSync": false,
-        "sort": 0,
-        "type": "query"
+        "type": "custom"
       },
       {
         "current": {
@@ -945,8 +1007,8 @@
     ]
   },
   "timezone": "",
-  "title": "🪵 RAG Service & Celery Worker Logs",
+  "title": "RAG Service & Celery Worker Logs",
   "uid": "rag-logs-dashboard",
-  "version": 1,
+  "version": 8,
   "weekStart": ""
 }
