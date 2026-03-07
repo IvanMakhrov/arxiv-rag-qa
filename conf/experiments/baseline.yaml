@@ -21,8 +21,8 @@ qdrant:
   port: 6333
   collection_name: ${experiments.mlflow.experiment_name}
   vector_size: 384
-  timeout: 60
-  batch_size: 8192
+  timeout: 36000
+  batch_size: 512
 
 generator:
   model_name: Qwen/Qwen2.5-0.5B-Instruct

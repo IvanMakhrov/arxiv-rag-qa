@@ -4,5 +4,5 @@ metadata_dir: data/metadata/metadata.json
 
 arxiv_category: cs.CL
 start_date: 202501010000
-target_paper_count: 1000
+target_paper_count: 100
 results_per_request: 5

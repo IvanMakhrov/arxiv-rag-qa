@@ -1,4 +1,5 @@
 import json
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -55,26 +56,18 @@ class QdrantManager:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=self.embedding_dir)
             body = response["Body"]
 
-            buffer = ""
-            chunk_size = 1024 * 1024 * 100
+            buffer_lines = []
+            chunk_size = 1024 * 1024 * 10
 
-            while True:
-                chunk = body.read(chunk_size)
-                if not chunk:
-                    break
+            for chunk in iter(lambda: body.read(chunk_size), b""):
+                buffer_lines.append(chunk.decode("utf-8"))
 
-                buffer += chunk.decode("utf-8")
+            full_text = "".join(buffer_lines)
 
-                lines = buffer.split("\n")
-                buffer = lines[-1]
-
-                for line in lines[:-1]:
-                    stripped = line.strip()
-                    if stripped:
-                        yield json.loads(stripped)
-
-            if buffer.strip():
-                yield json.loads(buffer.strip())
+            for line in full_text.split("\n"):
+                stripped = line.strip()
+                if stripped:
+                    yield json.loads(stripped)
 
         except Exception as e:
             logger.error(
@@ -108,8 +101,16 @@ class QdrantManager:
     def add_data(self) -> None:
         batch = []
         point_id = 0
+        time_checkpoint = 30
+        last_log_time = time.time()
 
-        for record in self._read_jsonl_lines():
+        for i, record in enumerate(self._read_jsonl_lines()):
+            if i % 1000 == 0 or (time.time() - last_log_time) > time_checkpoint:
+                elapsed = time.time() - last_log_time
+                rate = 1000 / elapsed if elapsed > 0 else 0
+                logger.info(f"Read {i} lines | Rate: {rate:.1f} lines/sec")
+                last_log_time = time.time()
+
             point = PointStruct(
                 id=point_id,
                 vector=record["embedding"],
