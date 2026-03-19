@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: project-code-config
+  namespace: rag-project
+data:
+  # This ConfigMap will contain the project code
+  # In a real deployment, you would mount your project code here
+  # For now, this is a placeholder
+  placeholder.txt: "This is a placeholder for project code"

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rag-project
+  labels:
+    name: rag-project
+    monitoring: enabled

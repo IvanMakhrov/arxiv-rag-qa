@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-dags-config
+  namespace: rag-project
+data:
+  # This ConfigMap will contain the DAG files
+  # In a real deployment, you would mount your DAG files here
+  # For now, this is a placeholder
+  placeholder.txt: "This is a placeholder for DAG files"

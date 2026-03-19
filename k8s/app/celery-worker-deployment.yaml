@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: rag-project
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: celery-worker:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - arxiv_rag_qa.celery_config
+            - worker
+            - --loglevel=info
+            - --concurrency=1
+            - --pool=solo
+            - --max-tasks-per-child=10
+            - --hostname=worker@%h
+            - --task-events
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          env:
+            - name: CELERY_BROKER_URL
+              value: "redis://redis:6379/0"
+            - name: CELERY_RESULT_BACKEND
+              value: "db+postgresql://airflow:airflow@postgresql-ha:5432/airflow"
+            - name: PYTHONPATH
+              value: "/app/src"
+            - name: AWS_ENDPOINT_URL
+              value: "http://minio-service:9000"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+            - name: DATABASE_URL
+              value: "postgresql://airflow:airflow@postgresql-ha:5432/airflow"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
