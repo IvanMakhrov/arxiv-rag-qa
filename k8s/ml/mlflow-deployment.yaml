@@ -30,11 +30,20 @@ spec:
             - name: MLFLOW_TRACKING_URI
               value: "http://mlflow-service:5000"
             - name: POSTGRES_USER
-              value: "airflow"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
-              value: "airflow"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
-              value: "airflow"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_DB
           resources:
             requests:
               memory: "512Mi"
