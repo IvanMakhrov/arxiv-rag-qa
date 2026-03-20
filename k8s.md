@@ -49,6 +49,7 @@ kubectl apply -f k8s/storage/redis-data-pvc.yaml
 
 ```bash
 kubectl apply -f k8s/secrets/app-secrets.yaml
+kubectl create secret generic app-secrets --from-env-file=.env -n rag-project
 ```
 
 Docker Registry secret (если тянете образы из private registry):

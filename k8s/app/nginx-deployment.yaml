@@ -26,6 +26,8 @@ spec:
             - name: nginx-conf
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
+            - name: nginx-static
+              mountPath: /app/static
             - name: nginx-data
               mountPath: /var/cache/nginx
             - name: nginx-logs
@@ -52,6 +54,7 @@ spec:
             items:
               - key: nginx.conf
                 path: nginx.conf
+        - name: nginx-static
         - name: nginx-data
           emptyDir: {}
         - name: nginx-logs

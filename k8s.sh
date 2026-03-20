@@ -21,6 +21,7 @@ SERVICES=(
     "Grafana:svc/grafana-service:3000:3000"
     "Prometheus:svc/prometheus:9090:9090"
     "MinIO:svc/minio-service:9001:9001"
+    "Nginx:svc/nginx-service:8080:80"
 )
 
 # Colors for output
@@ -75,13 +76,14 @@ start_port_forwards() {
 
     echo ""
     print_header "Access URLs"
-    echo -e "${GREEN}RAG UI:     http://localhost:8000${NC}"
-    echo -e "${GREEN}Airflow:    http://localhost:8081${NC}"
-    echo -e "${GREEN}MLflow:     http://localhost:5000${NC}"
-    echo -e "${GREEN}Qdrant:     http://localhost:6333${NC}"
-    echo -e "${GREEN}Grafana:    http://localhost:3000${NC}"
-    echo -e "${GREEN}Prometheus: http://localhost:9090${NC}"
-    echo -e "${GREEN}MinIO:      http://localhost:9001${NC}"
+    echo -e "${GREEN}Nginx (RAG): http://localhost:8080${NC}"    # ← Added
+    echo -e "${GREEN}RAG UI:      http://localhost:8000${NC}"
+    echo -e "${GREEN}Airflow:     http://localhost:8081${NC}"
+    echo -e "${GREEN}MLflow:      http://localhost:5000${NC}"
+    echo -e "${GREEN}Qdrant:      http://localhost:6333${NC}"
+    echo -e "${GREEN}Grafana:     http://localhost:3000${NC}"
+    echo -e "${GREEN}Prometheus:  http://localhost:9090${NC}"
+    echo -e "${GREEN}MinIO:       http://localhost:9001${NC}"
     echo ""
     print_info "To stop all port forwards, run: ./port-forward.sh stop"
     print_info "PIDs saved to: $PID_FILE"
