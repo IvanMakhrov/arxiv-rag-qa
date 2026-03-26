@@ -252,9 +252,10 @@ async def process_all_papers(request: ChunkRequest):
         task_data = {
             "bucket_name": request.bucket_name,
             "chunk_dir": request.chunk_dir,
-            "json_dir": request.json_dir,
+            "pdf_dir": request.pdf_dir,
             "chunk_size": request.chunk_size,
             "chunk_overlap": request.chunk_overlap,
+            "chunking_type": request.chunking_type,
         }
 
         celery_app.send_task("process_chunks", args=[task_data], task_id=task_id)

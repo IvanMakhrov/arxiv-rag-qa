@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from arxiv_rag_qa.celery_config import celery_app
-from arxiv_rag_qa.data.chunking import process_all_papers_to_chunks
+from arxiv_rag_qa.chunking import full_text_chunking, section_aware_chunking
 from arxiv_rag_qa.tasks.base import DatabaseTask
 
 
@@ -14,19 +14,30 @@ def process_chunks_task(self, request_data):
     try:
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
-        total_chunks = process_all_papers_to_chunks(
-            bucket_name=request_data["bucket_name"],
-            chunk_dir=request_data["chunk_dir"],
-            json_dir=request_data["json_dir"],
-            chunk_size=request_data["chunk_size"],
-            chunk_overlap=request_data["chunk_overlap"],
-        )
+        chunking_type = request_data["chunking_type"]
+
+        if chunking_type == "full_text":
+            total_chunks = full_text_chunking.chunking(
+                bucket_name=request_data["bucket_name"],
+                chunk_dir=request_data["chunk_dir"],
+                pdf_dir=request_data["pdf_dir"],
+                chunk_size=request_data["chunk_size"],
+                chunk_overlap=request_data["chunk_overlap"],
+            )
+        elif chunking_type == "section_aware":
+            total_chunks = section_aware_chunking.chunking(
+                bucket_name=request_data["bucket_name"],
+                chunk_dir=request_data["chunk_dir"],
+                pdf_dir=request_data["pdf_dir"],
+                chunk_size=request_data["chunk_size"],
+                chunk_overlap=request_data["chunk_overlap"],
+            )
 
         result_data = {
             "total_chunks": total_chunks,
             "bucket_name": request_data["bucket_name"],
             "chunk_dir": request_data["chunk_dir"],
-            "json_dir": request_data["json_dir"],
+            "pdf_dir": request_data["pdf_dir"],
             "chunk_size": request_data["chunk_size"],
             "chunk_overlap": request_data["chunk_overlap"],
         }

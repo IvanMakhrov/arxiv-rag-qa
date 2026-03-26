@@ -37,9 +37,10 @@ with DAG(
             "payload": {
                 "bucket_name": cfg.infrastructure.minio.bucket_name,
                 "chunk_dir": cfg.experiments.chunking.chunk_dir,
-                "json_dir": cfg.data.json_dir,
+                "pdf_dir": cfg.data.pdf_dir,
                 "chunk_size": cfg.experiments.chunking.chunk_size,
                 "chunk_overlap": cfg.experiments.chunking.chunk_overlap,
+                "chunking_type": cfg.experiments.chunking.chunking_type,
             },
             "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },

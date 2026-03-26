@@ -42,9 +42,10 @@ class ParseResponse(BaseModel):
 class ChunkRequest(BaseModel):
     bucket_name: str
     chunk_dir: str
-    json_dir: str
+    pdf_dir: str
     chunk_size: int
     chunk_overlap: int
+    chunking_type: str
 
 
 class ChunkResponse(BaseModel):

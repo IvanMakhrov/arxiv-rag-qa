@@ -5,6 +5,7 @@ chunking:
   chunk_size: 512
   chunk_overlap: 50
   chunk_dir: ${experiments.mlflow.experiment_name}/chunking.jsonl
+  chunking_type: section_aware
 
 embeddings:
   embedding_dir: ${experiments.mlflow.experiment_name}/embeddings.jsonl
