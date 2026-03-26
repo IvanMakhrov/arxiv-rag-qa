@@ -11,7 +11,6 @@ celery_app = Celery(
     backend=result_backend,
     include=[
         "arxiv_rag_qa.tasks.download",
-        "arxiv_rag_qa.tasks.parse",
         "arxiv_rag_qa.tasks.chunk",
         "arxiv_rag_qa.tasks.embeddings",
         "arxiv_rag_qa.tasks.test_data",
