@@ -8,6 +8,7 @@ from rouge_score import rouge_scorer
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 
+# from arxiv_rag_qa.eval.llm_judge import evaluate_llm_metrics  # Disabled: LLM-as-judge removed
 from arxiv_rag_qa.rag.generator import QwenGenerator
 from arxiv_rag_qa.rag.retriever import DenseRetriever
 from utils.setup_logger import setup_logger
@@ -55,26 +56,30 @@ def compute_bertscore(predictions: list[str], references: list[str], bertscore_m
 
 def compute_faithfulness(answers: list[str], contexts: list[str]) -> float:
     """
-    Simple n-gram coverage: % of answer unigrams found in context.
+    Compute faithfulness as the percentage of answer unigrams that appear in the context.
     """
     scores = []
     for ans, ctx in zip(answers, contexts, strict=False):
         if not ans.strip():
             scores.append(0.0)
             continue
+        # Use CountVectorizer to tokenize and get vocabulary
         vec = CountVectorizer(ngram_range=(1, 1), lowercase=True, token_pattern=r"\b\w+\b")
         try:
-            vec.fit_transform([ctx])
-            ans_matrix = vec.transform([ans])
+            # Fit on context to get vocabulary
+            vec.fit([ctx])
             ctx_vocab = set(vec.get_feature_names_out())
-            ans_vocab = set(vec.inverse_transform(ans_matrix)[0])
-            if not ans_vocab:
+            # Tokenize answer using the same analyzer
+            ans_tokens = vec.build_analyzer()(ans)
+            if not ans_tokens:
                 scores.append(0.0)
-            else:
-                scores.append(len(ans_vocab & ctx_vocab) / len(ans_vocab))
+                continue
+            # Count how many answer tokens are in context vocabulary
+            in_context = sum(1 for token in ans_tokens if token in ctx_vocab)
+            scores.append(in_context / len(ans_tokens))
         except ValueError:
             scores.append(0.0)
-    return sum(scores) / len(scores)
+    return sum(scores) / len(scores) if scores else 0.0
 
 
 def generator_eval(
@@ -108,6 +113,7 @@ def generator_eval(
     predictions = []
     references = []
     contexts = []
+    # questions = []  # Not used without LLM-as-judge
 
     for i, sample in enumerate(test_samples):
         logger.info(f"\rGenerating {i + 1}/{len(test_samples)}")
@@ -120,15 +126,35 @@ def generator_eval(
         predictions.append(pred)
         references.append(sample["answer"])
         contexts.append(context)
+        # questions.append(sample["question"])  # Not used without LLM-as-judge
 
+    # Traditional metrics
     rouge = compute_rouge(predictions, references)
     bleu = compute_bleu(predictions, references)
     bert_f1 = compute_bertscore(predictions, references, bertscore_model)
     faithfulness = compute_faithfulness(predictions, contexts)
 
+    # LLM-based metrics
+    # llm_metrics = evaluate_llm_metrics(
+    #     predictions=predictions,
+    #     questions=questions,
+    #     ground_truths=references,
+    #     contexts=contexts,
+    # )
+
+    # Combine all metrics
+    all_metrics = {
+        "rougeL": rouge["rougeL"],
+        "bleu": bleu,
+        "bertscore_f1": bert_f1,
+        "faithfulness_ngram": faithfulness,
+        # **llm_metrics,  # answer_relevance, correctness, faithfulness, conciseness
+    }
+
     logger.info(
         f"Metrics: ROUGE-L: {rouge['rougeL']:.4f}, BLEU: {bleu:.4f}, "
-        f"BERTScore F1: {bert_f1:.4f}, Faithfulness: {faithfulness:.4f}"
+        f"BERTScore F1: {bert_f1:.4f}, Faithfulness (ngram): {faithfulness:.4f}, "
+        # f"LLM Judge: {', '.join([f'{k}: {v:.4f}' for k, v in llm_metrics.items()])}"
     )
 
     return {
@@ -138,10 +164,5 @@ def generator_eval(
             "top_k": top_k,
             "test_file": test_data_dir,
         },
-        "metrics": {
-            "rougeL": rouge["rougeL"],
-            "bleu": bleu,
-            "bertscore_f1": bert_f1,
-            "faithfulness": faithfulness,
-        },
+        "metrics": all_metrics,
     }

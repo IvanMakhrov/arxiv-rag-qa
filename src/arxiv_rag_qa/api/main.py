@@ -373,6 +373,8 @@ async def generate_test_dataset(request: TestDataRequest):
             "test_data_dir": request.test_data_dir,
             "metadata_dir": request.metadata_dir,
             "test_data_size": request.test_data_size,
+            "max_questions_per_paper": request.max_questions_per_paper,
+            "test_type": request.test_type,
         }
 
         celery_app.send_task("generate_test_data", args=[task_data], task_id=task_id)

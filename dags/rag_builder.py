@@ -54,6 +54,8 @@ with DAG(
             "http_conn_id": cfg.infrastructure.dag.http_conn_id,
             "max_wait_time": cfg.infrastructure.dag.chunking_timeout,
             "poll_interval": 25,
+            "max_retries": 3,
+            "retry_delay": 60,
         },
     )
 
@@ -93,6 +95,8 @@ with DAG(
             "http_conn_id": cfg.infrastructure.dag.http_conn_id,
             "max_wait_time": cfg.infrastructure.dag.embeddings_timeout,
             "poll_interval": 45,
+            "max_retries": 5,
+            "retry_delay": 120,
         },
     )
 
@@ -117,6 +121,8 @@ with DAG(
                 "test_data_dir": cfg.experiments.test_data.test_data_dir,
                 "metadata_dir": cfg.data.metadata_dir,
                 "test_data_size": cfg.experiments.test_data.test_data_size,
+                "max_questions_per_paper": cfg.experiments.test_data.max_questions_per_paper,
+                "test_type": cfg.experiments.test_data.test_type,
             },
             "http_conn_id": cfg.infrastructure.dag.http_conn_id,
         },
@@ -130,6 +136,8 @@ with DAG(
             "http_conn_id": cfg.infrastructure.dag.http_conn_id,
             "max_wait_time": cfg.infrastructure.dag.test_data_timeout,
             "poll_interval": 15,
+            "max_retries": 3,
+            "retry_delay": 60,
         },
     )
 
@@ -170,6 +178,8 @@ with DAG(
             "http_conn_id": cfg.infrastructure.dag.http_conn_id,
             "max_wait_time": cfg.infrastructure.dag.qdrant_timeout,
             "poll_interval": 30,
+            "max_retries": 3,
+            "retry_delay": 60,
         },
     )
 

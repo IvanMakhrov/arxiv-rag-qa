@@ -82,6 +82,8 @@ class TestDataRequest(BaseModel):
     test_data_dir: str
     metadata_dir: str
     test_data_size: int
+    max_questions_per_paper: int
+    test_type: str
 
 
 class TestDataResponse(BaseModel):
@@ -91,6 +93,8 @@ class TestDataResponse(BaseModel):
     test_data_dir: str
     metadata_dir: str
     test_data_size: int
+    max_questions_per_paper: int
+    test_type: str
 
 
 class TaskStatusResponse(BaseModel):

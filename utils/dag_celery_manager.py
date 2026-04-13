@@ -14,7 +14,7 @@ def trigger_task(
     http_conn_id: str = "rag_service",
     **context,
 ) -> str:
-    """Триггер асинхронной задачи"""
+    """Trigger an asynchronous task."""
     hook = HttpHook(method="POST", http_conn_id=http_conn_id)
     try:
         response = hook.run(
@@ -37,12 +37,15 @@ def wait_for_task(
     http_conn_id: str = "rag_service",
     max_wait_time: int = 3600,
     poll_interval: int = 15,
+    max_retries: int = 3,
+    retry_delay: int = 60,
     **context,
 ) -> str:
-    """Ожидание завершения задачи. Возвращает ТОЛЬКО task_id"""
+    """Wait for task completion with retry logic. Returns task_id only."""
     hook = HttpHook(method="GET", http_conn_id=http_conn_id)
     start_time = time.time()
-    print(f"Waiting for task {task_id} (timeout: {max_wait_time}s)")
+    retries = 0
+    print(f"Waiting for task {task_id} (timeout: {max_wait_time}s, max retries: {max_retries})")
 
     while time.time() - start_time < max_wait_time:
         try:
@@ -67,12 +70,22 @@ def wait_for_task(
                 error = status_data.get("errorMessage") or status_data.get(
                     "error_message", "Unknown"
                 )
-                raise AirflowException(f"Task failed: {error}")
+                if retries < max_retries:
+                    retries += 1
+                    print(f"⚠️  Task failed, retrying ({retries}/{max_retries}): {error}")
+                    time.sleep(retry_delay)
+                    continue
+                raise AirflowException(f"Task failed after {max_retries} retries: {error}")
 
             time.sleep(poll_interval)
         except Exception as e:
             print(f"⚠️  Polling error: {e!s}")
-            time.sleep(poll_interval)
+            if retries < max_retries:
+                retries += 1
+                print(f"⚠️  Polling error, retrying ({retries}/{max_retries})")
+                time.sleep(retry_delay)
+            else:
+                time.sleep(poll_interval)
 
     raise AirflowException(f"Task timeout after {max_wait_time}s")
 

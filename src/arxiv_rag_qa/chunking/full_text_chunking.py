@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from typing import Any
@@ -38,6 +39,13 @@ def preprocess_text(text: str) -> str:
     text = re.sub(r"\n[1-9]\s+", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+
+def _generate_chunk_id(arxiv_id: str, section: str, chunk_idx: int, text: str) -> str:
+    hash_input = f"{arxiv_id}:{section}:{chunk_idx}:{text[:100]}"
+    hash_value = hashlib.md5(hash_input.encode()).hexdigest()[:8]
+    section_clean = section.lower().replace(" ", "_")
+    return f"{arxiv_id}_{section_clean}_{chunk_idx:04d}_{hash_value}"
 
 
 def split_text_recursive(  # noqa: C901
@@ -115,6 +123,7 @@ def chunking(
     for pdf_key in pdf_files:
         try:
             arxiv_id = pdf_key.rstrip(".pdf").split("/")[-1]
+            arxiv_id_clean = re.sub(r"v\d+$", "", arxiv_id)
 
             logger.info(f"Processing: {pdf_key}")
             pdf_obj = s3_client.get_object(Bucket=bucket_name, Key=pdf_key)
@@ -135,18 +144,19 @@ def chunking(
                 if chunk_text.strip():
                     all_chunks.append(
                         {
-                            "id": f"{arxiv_id}_chunk_{i:04d}",
-                            "text": chunk_text,
+                            "id": _generate_chunk_id(arxiv_id_clean, "full_text", i, chunk_text),
+                            "text": chunk_text.strip(),
                             "metadata": {
-                                "arxiv_id": arxiv_id,
+                                "arxiv_id": arxiv_id_clean,
                                 "source": pdf_key,
+                                "section": "full_text",
                                 "chunk_idx": i,
-                                "chunk_size": len(chunk_text),
+                                "chunk_size": len(chunk_text.strip()),
                             },
                         }
                     )
 
-            logger.info(f"  → {len(chunks)} chunks from {arxiv_id}")
+            logger.info(f"  → {len(chunks)} chunks from {arxiv_id_clean}")
 
         except Exception as e:
             logger.error(f"Failed to process {pdf_key}: {type(e).__name__}: {e}")

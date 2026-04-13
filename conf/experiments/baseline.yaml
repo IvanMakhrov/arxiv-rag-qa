@@ -5,7 +5,7 @@ chunking:
   chunk_size: 512
   chunk_overlap: 50
   chunk_dir: ${experiments.mlflow.experiment_name}/chunking.jsonl
-  chunking_type: section_aware
+  chunking_type: full_text
 
 embeddings:
   embedding_dir: ${experiments.mlflow.experiment_name}/embeddings.jsonl
@@ -16,6 +16,8 @@ embeddings:
 test_data:
   test_data_dir: ${experiments.mlflow.experiment_name}/test_data.jsonl
   test_data_size: 10
+  max_questions_per_paper: 3
+  test_type: llm
 
 qdrant:
   host: qdrant

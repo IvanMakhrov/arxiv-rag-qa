@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: airflow-config
-  namespace: rag-project
-data:
-  AIRFLOW_UID: "50000"
-  _PIP_ADDITIONAL_REQUIREMENTS: "-e /opt/airflow/project[airflow]"

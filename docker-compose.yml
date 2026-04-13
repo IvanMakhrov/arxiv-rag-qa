@@ -142,6 +142,9 @@ services:
       - CELERY_RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
       - DEBUG=False
       - ENVIRONMENT=production
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_API_BASE=${OPENROUTER_API_BASE}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -279,6 +282,9 @@ services:
       - DATABASE_URL=postgresql://airflow:airflow@postgres/airflow
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_API_BASE=${OPENROUTER_API_BASE}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL}
     depends_on:
       redis:
         condition: service_healthy
