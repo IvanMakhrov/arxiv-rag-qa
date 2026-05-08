@@ -3,12 +3,14 @@ import math
 from typing import Any
 
 import boto3
+from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
+from arxiv_rag_qa.rag.hybrid_retriever import HybridRetriever
 from arxiv_rag_qa.rag.retriever import DenseRetriever
+from arxiv_rag_qa.rag.sparse_retriever import SparseRetriever
 from utils.setup_logger import setup_logger
 
-# Logging setup
 logger = setup_logger(__name__)
 
 
@@ -75,19 +77,15 @@ def ndcg_at_k(retrieved_ids: list[int], relevant_ids: set[int], k: int) -> float
     if not relevant_ids:
         return 0.0
 
-    # Create a relevance mapping (binary relevance: 1 if relevant, 0 otherwise)
     relevance = [1 if rid in relevant_ids else 0 for rid in retrieved_ids[:k]]
 
     if not relevance:
         return 0.0
 
-    # Calculate DCG with logarithmic discount
     dcg = 0.0
     for i, rel in enumerate(relevance):
-        # Using log2(i+2) for 0-based index (i+1 would be rank, i+2 = rank+1)
         dcg += rel / math.log2(i + 2)
 
-    # Calculate IDCG (ideal DCG)
     ideal_relevance = sorted(relevance, reverse=True)
     idcg = 0.0
     for i, rel in enumerate(ideal_relevance):
@@ -98,7 +96,119 @@ def ndcg_at_k(retrieved_ids: list[int], relevant_ids: set[int], k: int) -> float
     return dcg / idcg
 
 
-def retriever_eval(
+def create_eval_retriever(
+    retriever_type: str,
+    collection_name: str,
+    top_k: int,
+    model_name: str,
+    qdrant_host: str,
+    qdrant_port: int,
+    **kwargs,
+):
+    """
+    Create a retriever for evaluation based on the specified type.
+
+    Args:
+        retriever_type: Type of retriever ("dense", "sparse", "hybrid")
+        collection_name: Qdrant collection name
+        top_k: Number of documents to retrieve
+        model_name: Embedding model name (for dense/hybrid) or sparse method name
+        qdrant_host: Qdrant host
+        qdrant_port: Qdrant port
+        **kwargs: Additional retriever-specific configuration
+
+    Returns:
+        A retriever instance (DenseRetriever, SparseRetriever, or HybridRetriever)
+    """
+    if retriever_type == "dense":
+        embedder = SentenceTransformer(model_name)
+
+        def embedding_func(x):
+            return embedder.encode(x, normalize_embeddings=True).tolist()
+
+        return DenseRetriever(
+            collection_name=collection_name,
+            embedding_model=embedding_func,
+            top_k=top_k,
+            qdrant_host=qdrant_host,
+            qdrant_port=qdrant_port,
+        )
+
+    if retriever_type == "sparse":
+        sparse_method = kwargs.get("sparse_method", "bm25")
+        use_qdrant_corpus = kwargs.get("use_qdrant_corpus", True)
+        sparse_params = kwargs.get("sparse_params", {})
+
+        qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
+
+        retriever = SparseRetriever(
+            collection_name=collection_name,
+            top_k=top_k,
+            use_tfidf=sparse_method == "tfidf",
+            tfidf_params=sparse_params.get("tfidf_params"),
+            bm25_params=sparse_params.get("bm25_params"),
+        )
+
+        if use_qdrant_corpus:
+            corpus = retriever._extract_corpus_from_qdrant(qdrant_client, collection_name)
+            if corpus:
+                retriever.corpus = corpus
+                retriever.is_built = True
+                retriever._build_index()
+
+        return retriever
+
+    if retriever_type == "hybrid":
+        embedder = SentenceTransformer(model_name)
+
+        def embedding_func(x):
+            return embedder.encode(x, normalize_embeddings=True).tolist()
+
+        dense_retriever = DenseRetriever(
+            collection_name=collection_name,
+            embedding_model=embedding_func,
+            top_k=top_k,
+            qdrant_host=qdrant_host,
+            qdrant_port=qdrant_port,
+        )
+
+        sparse_method = kwargs.get("sparse_method", "bm25")
+        use_qdrant_corpus = kwargs.get("use_qdrant_corpus", True)
+        sparse_params = kwargs.get("sparse_params", {})
+
+        qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
+
+        sparse_retriever = SparseRetriever(
+            collection_name=collection_name,
+            top_k=top_k,
+            use_tfidf=sparse_method == "tfidf",
+            tfidf_params=sparse_params.get("tfidf_params"),
+            bm25_params=sparse_params.get("bm25_params"),
+        )
+
+        if use_qdrant_corpus:
+            corpus = sparse_retriever._extract_corpus_from_qdrant(qdrant_client, collection_name)
+            if corpus:
+                sparse_retriever.corpus = corpus
+                sparse_retriever.is_built = True
+                sparse_retriever._build_index()
+
+        hybrid_config = kwargs.get("hybrid_config", {})
+        return HybridRetriever(
+            dense_retriever=dense_retriever,
+            sparse_retriever=sparse_retriever,
+            fusion_method=hybrid_config.get("fusion_method", "weighted_sum"),
+            dense_weight=hybrid_config.get("dense_weight", 0.7),
+            sparse_weight=hybrid_config.get("sparse_weight", 0.3),
+            rank_fusion_k=hybrid_config.get("rank_fusion_k", 100),
+            normalize_scores=hybrid_config.get("normalize_scores", True),
+            deduplicate=hybrid_config.get("deduplicate", True),
+        )
+
+    raise ValueError(f"Unknown retriever type: {retriever_type}")
+
+
+def retriever_eval(  # noqa: PLR0913
     bucket_name: str,
     test_data_dir: str,
     collection_name: str,
@@ -106,21 +216,26 @@ def retriever_eval(
     model_name: str,
     qdrant_host: str,
     qdrant_port: int,
+    retriever_type: str = "dense",
+    sparse_method: str = "bm25",
+    use_qdrant_corpus: bool = True,
+    hybrid_config: dict | None = None,
+    sparse_params: dict | None = None,
 ):
     s3_client = get_minio_client()
     test_samples = load_test_set_from_minio(bucket_name, test_data_dir, s3_client)
 
-    embedder = SentenceTransformer(model_name)
-
-    def embedding_func(x):
-        return embedder.encode(x, normalize_embeddings=True).tolist()
-
-    retriever = DenseRetriever(
+    retriever = create_eval_retriever(
+        retriever_type=retriever_type,
         collection_name=collection_name,
-        embedding_model=embedding_func,
         top_k=top_k,
+        model_name=model_name,
         qdrant_host=qdrant_host,
         qdrant_port=qdrant_port,
+        sparse_method=sparse_method,
+        use_qdrant_corpus=use_qdrant_corpus,
+        hybrid_config=hybrid_config or {},
+        sparse_params=sparse_params or {},
     )
 
     recall_scores = []
@@ -156,7 +271,7 @@ def retriever_eval(
     avg_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
 
     logger.info(
-        f"Metrics: Top-k: {top_k}, "
+        f"Retriever type: {retriever_type}, Top-k: {top_k}, "
         f"Precision@{top_k}: {avg_precision:.4f}, "
         f"Recall@{top_k}: {avg_recall:.4f}, "
         f"Accuracy@{top_k}: {avg_accuracy:.4f}, "
@@ -171,6 +286,8 @@ def retriever_eval(
             "collection_name": collection_name,
             "top_k": top_k,
             "embedder": model_name,
+            "retriever_type": retriever_type,
+            "sparse_method": sparse_method,
         },
         "metrics": {
             "precision_at_k": avg_precision,

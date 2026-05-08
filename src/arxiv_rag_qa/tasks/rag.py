@@ -14,24 +14,47 @@ def get_rag_response_task(self, request_data):
     try:
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
+        emb_model_name = request_data.get("emb_model_name", "all-MiniLM-L6-v2")
+        embedding_model = request_data.get("embedding_model", "all-MiniLM-L6-v2")
+        retriever_type = request_data.get("retriever_type", "dense")
+        sparse_method = request_data.get("sparse_method", "bm25")
+        use_qdrant_corpus = request_data.get("use_qdrant_corpus", True)
+        hybrid_config = request_data.get("hybrid_config", {})
+        sparse_params = request_data.get("sparse_params", {})
+        in_memory = request_data.get("in_memory", False)
+
         response = get_response(
-            emb_model_name=request_data["emb_model_name"],
+            emb_model_name=emb_model_name,
             collection_name=request_data["collection_name"],
             top_k=request_data["top_k"],
             gen_model_name=request_data["gen_model_name"],
             query=request_data["query"],
             qdrant_host=request_data["qdrant_host"],
             qdrant_port=request_data["qdrant_port"],
+            retriever_type=retriever_type,
+            sparse_method=sparse_method,
+            use_qdrant_corpus=use_qdrant_corpus,
+            hybrid_config=hybrid_config,
+            sparse_params=sparse_params,
+            in_memory=in_memory,
+            embedding_model=embedding_model,
         )
 
         result_data = {
-            "answer": response,
-            "sources": [],
-            "emb_model_name": request_data["emb_model_name"],
+            "answer": response.get("answer", ""),
+            "sources": response.get("sources", []),
+            "emb_model_name": emb_model_name,
             "collection_name": request_data["collection_name"],
             "top_k": request_data["top_k"],
             "gen_model_name": request_data["gen_model_name"],
             "query": request_data["query"],
+            "retriever_type": retriever_type,
+            "sparse_method": sparse_method,
+            "use_qdrant_corpus": use_qdrant_corpus,
+            "in_memory": in_memory,
+            "hybrid_config": hybrid_config,
+            "sparse_params": sparse_params,
+            "embedding_model": embedding_model,
         }
 
         self.update_task_status(

@@ -14,7 +14,6 @@ from utils.setup_logger import setup_logger
 
 logger = setup_logger(__name__)
 
-# Expected lengths for chunk ID components
 HASH_LENGTH = 8
 CHUNK_IDX_LENGTH = 4
 MIN_CHUNK_ID_PARTS = 4

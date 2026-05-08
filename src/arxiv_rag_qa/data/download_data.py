@@ -9,7 +9,6 @@ import requests
 
 from utils.setup_logger import setup_logger
 
-# Logging setup
 logger = setup_logger(__name__)
 
 

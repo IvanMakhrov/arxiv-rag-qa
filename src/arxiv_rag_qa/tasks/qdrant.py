@@ -14,6 +14,8 @@ def setup_qdrant_task(self, request_data):
     try:
         self.update_task_status(task_id, status="processing", started_at=datetime.utcnow())
 
+        retriever_type = request_data.get("retriever_type", "dense")
+
         qdrant = QdrantManager(
             host=request_data["host"],
             port=request_data["port"],
@@ -21,11 +23,12 @@ def setup_qdrant_task(self, request_data):
             vector_size=request_data["vector_size"],
             bucket_name=request_data["bucket_name"],
             embedding_dir=request_data["embedding_dir"],
+            chunk_dir=request_data.get("chunk_dir", ""),
             timeout=request_data["timeout"],
             batch_size=request_data["batch_size"],
         )
 
-        count = qdrant.setup()
+        count = qdrant.setup(retriever_type=retriever_type)
 
         result_data = {
             "points_number": count,
@@ -33,6 +36,8 @@ def setup_qdrant_task(self, request_data):
             "vector_size": request_data["vector_size"],
             "bucket_name": request_data["bucket_name"],
             "embedding_dir": request_data["embedding_dir"],
+            "chunk_dir": request_data.get("chunk_dir", ""),
+            "retriever_type": retriever_type,
             "batch_size": request_data["batch_size"],
         }
 

@@ -19,6 +19,9 @@ default_args = {
     "retry_delay": timedelta(minutes=cfg.infrastructure.dag.retry_delay),
 }
 
+retriever_type = cfg.experiments.retriever.get("type", "dense")
+needs_embeddings = retriever_type in ("dense", "hybrid")
+
 with DAG(
     "build_rag",
     default_args=default_args,
@@ -69,45 +72,46 @@ with DAG(
     )
 
     # ============ EMBEDDINGS ============
-    trigger_embeddings = PythonOperator(
-        task_id="trigger_embeddings",
-        python_callable=trigger_task,
-        op_kwargs={
-            "endpoint": "/embeddings",
-            "payload": {
-                "bucket_name": cfg.infrastructure.minio.bucket_name,
-                "chunk_dir": cfg.experiments.chunking.chunk_dir,
-                "embedding_dir": cfg.experiments.embeddings.embedding_dir,
-                "model_name": cfg.experiments.embeddings.model_name,
-                "batch_size": cfg.experiments.embeddings.batch_size,
-                "checkpoint_interval": cfg.experiments.embeddings.checkpoint_interval,
+    if needs_embeddings:
+        trigger_embeddings = PythonOperator(
+            task_id="trigger_embeddings",
+            python_callable=trigger_task,
+            op_kwargs={
+                "endpoint": "/embeddings",
+                "payload": {
+                    "bucket_name": cfg.infrastructure.minio.bucket_name,
+                    "chunk_dir": cfg.experiments.chunking.chunk_dir,
+                    "embedding_dir": cfg.experiments.embeddings.embedding_dir,
+                    "model_name": cfg.experiments.embeddings.default_model,
+                    "batch_size": cfg.experiments.embeddings.batch_size,
+                    "checkpoint_interval": cfg.experiments.embeddings.checkpoint_interval,
+                },
+                "http_conn_id": cfg.infrastructure.dag.http_conn_id,
             },
-            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
-        },
-    )
+        )
 
-    wait_embeddings = PythonOperator(
-        task_id="wait_embeddings",
-        python_callable=wait_for_task,
-        op_kwargs={
-            "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_embeddings', "
-            "key='task_id') }}",
-            "http_conn_id": cfg.infrastructure.dag.http_conn_id,
-            "max_wait_time": cfg.infrastructure.dag.embeddings_timeout,
-            "poll_interval": 45,
-            "max_retries": 5,
-            "retry_delay": 120,
-        },
-    )
+        wait_embeddings = PythonOperator(
+            task_id="wait_embeddings",
+            python_callable=wait_for_task,
+            op_kwargs={
+                "task_id": "{{ task_instance.xcom_pull(task_ids='trigger_embeddings', "
+                "key='task_id') }}",
+                "http_conn_id": cfg.infrastructure.dag.http_conn_id,
+                "max_wait_time": cfg.infrastructure.dag.embeddings_timeout,
+                "poll_interval": 45,
+                "max_retries": 5,
+                "retry_delay": 120,
+            },
+        )
 
-    log_embeddings = PythonOperator(
-        task_id="log_embeddings",
-        python_callable=log_task_to_mlflow,
-        op_kwargs={
-            "task_stage": "embedding",
-            "experiment_name": cfg.experiments.mlflow.experiment_name,
-        },
-    )
+        log_embeddings = PythonOperator(
+            task_id="log_embeddings",
+            python_callable=log_task_to_mlflow,
+            op_kwargs={
+                "task_stage": "embedding",
+                "experiment_name": cfg.experiments.mlflow.experiment_name,
+            },
+        )
 
     # ============ TEST DATA ============
     trigger_test_data = PythonOperator(
@@ -163,6 +167,8 @@ with DAG(
                 "vector_size": cfg.experiments.qdrant.vector_size,
                 "bucket_name": cfg.infrastructure.minio.bucket_name,
                 "embedding_dir": cfg.experiments.embeddings.embedding_dir,
+                "chunk_dir": cfg.experiments.chunking.chunk_dir,
+                "retriever_type": retriever_type,
                 "timeout": cfg.experiments.qdrant.timeout,
                 "batch_size": cfg.experiments.qdrant.batch_size,
             },
@@ -193,17 +199,30 @@ with DAG(
     )
 
     # ============ DAG DEPENDENCIES ============
-    (
-        trigger_chunking
-        >> wait_chunking
-        >> log_chunking
-        >> trigger_embeddings
-        >> wait_embeddings
-        >> log_embeddings
-        >> trigger_test_data
-        >> wait_test_data
-        >> log_test_data
-        >> trigger_qdrant
-        >> wait_qdrant
-        >> log_qdrant
-    )
+    if needs_embeddings:
+        (
+            trigger_chunking
+            >> wait_chunking
+            >> log_chunking
+            >> trigger_embeddings
+            >> wait_embeddings
+            >> log_embeddings
+            >> trigger_test_data
+            >> wait_test_data
+            >> log_test_data
+            >> trigger_qdrant
+            >> wait_qdrant
+            >> log_qdrant
+        )
+    else:
+        (
+            trigger_chunking
+            >> wait_chunking
+            >> log_chunking
+            >> trigger_test_data
+            >> wait_test_data
+            >> log_test_data
+            >> trigger_qdrant
+            >> wait_qdrant
+            >> log_qdrant
+        )

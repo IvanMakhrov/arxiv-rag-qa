@@ -23,6 +23,11 @@ def evaluate_retriever_task(self, request_data):
             model_name=request_data["model_name"],
             qdrant_host=request_data["qdrant_host"],
             qdrant_port=request_data["qdrant_port"],
+            retriever_type=request_data.get("retriever_type", "dense"),
+            sparse_method=request_data.get("sparse_method", "bm25"),
+            use_qdrant_corpus=request_data.get("use_qdrant_corpus", True),
+            hybrid_config=request_data.get("hybrid_config"),
+            sparse_params=request_data.get("sparse_params"),
         )
 
         result_data = {
@@ -32,6 +37,8 @@ def evaluate_retriever_task(self, request_data):
             "collection_name": request_data["collection_name"],
             "top_k": request_data["top_k"],
             "model_name": request_data["model_name"],
+            "retriever_type": request_data.get("retriever_type", "dense"),
+            "sparse_method": request_data.get("sparse_method", "bm25"),
         }
 
         self.update_task_status(
@@ -69,6 +76,12 @@ def evaluate_generator_task(self, request_data):
             bertscore_model=request_data["bertscore_model"],
             qdrant_host=request_data["qdrant_host"],
             qdrant_port=request_data["qdrant_port"],
+            llm_judge_model=request_data.get("llm_judge_model"),
+            retriever_type=request_data.get("retriever_type", "dense"),
+            sparse_method=request_data.get("sparse_method", "bm25"),
+            use_qdrant_corpus=request_data.get("use_qdrant_corpus", True),
+            hybrid_config=request_data.get("hybrid_config"),
+            sparse_params=request_data.get("sparse_params"),
         )
 
         result_data = {

@@ -13,9 +13,25 @@ class RAGPipeline:
 
         answer = self.generator.generate(query, context)
 
+        sources = []
+        seen_arxiv_ids = set()
+        for doc in docs:
+            payload = doc["payload"]
+            arxiv_id = payload.get("arxiv_id", "")
+            if arxiv_id and arxiv_id not in seen_arxiv_ids:
+                seen_arxiv_ids.add(arxiv_id)
+                sources.append(
+                    {
+                        "arxiv_id": arxiv_id,
+                        "url": f"https://arxiv.org/abs/{arxiv_id}",
+                        "score": doc["score"],
+                    }
+                )
+
         return {
             "query": query,
             "answer": answer,
+            "sources": sources,
             "retrieved_contexts": [doc["payload"]["text"] for doc in docs],
             "scores": [doc["score"] for doc in docs],
         }

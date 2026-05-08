@@ -79,7 +79,6 @@ def generate_test_samples(  # noqa: C901
     """Generate diverse Q&A pairs from paper chunks and metadata."""
     random.seed(42)  # For reproducibility
 
-    # Question templates by category
     templates = {
         "contribution": [
             "What is the main contribution of the paper titled '{title}'?",
@@ -112,7 +111,6 @@ def generate_test_samples(  # noqa: C901
         ],
     }
 
-    # Keywords for categorizing chunks
     keywords = {
         "method": [
             "propose",
@@ -160,14 +158,12 @@ def generate_test_samples(  # noqa: C901
                 return category
         return "other"
 
-    # Determine target number of papers to include
     total_papers = len(paper_to_chunks)
     if test_data_size > 0:
         target_papers = int(total_papers * 0.01 * test_data_size)
     else:
         target_papers = total_papers
 
-    # Randomly select paper IDs
     paper_ids = list(paper_to_chunks.keys())
     random.shuffle(paper_ids)
     selected_paper_ids = paper_ids[:target_papers]
@@ -188,21 +184,17 @@ def generate_test_samples(  # noqa: C901
 
         paper_questions = []
 
-        # 1. Contribution question based on abstract (if available)
         if abstract and len(abstract) >= min_abstract_len:
             question = random.choice(templates["contribution"]).format(title=title)
             paper_questions.append(
                 {
                     "question": question,
                     "answer": abstract,
-                    # All chunks relevant for abstract-level question
                     "relevant_chunk_ids": chunk_indices,
                     "category": "contribution",
                 }
             )
 
-        # 2. Chunk-based questions from different categories
-        # Build mapping from category to chunk indices
         cat_to_indices = defaultdict(list)
         for idx in chunk_indices:
             chunk = chunks[idx]
@@ -210,7 +202,6 @@ def generate_test_samples(  # noqa: C901
             cat = categorize_chunk(text)
             cat_to_indices[cat].append(idx)
 
-        # For each category (excluding contribution), add at most one question
         categories = ["method", "dataset", "result", "limitation", "other"]
         for cat in categories:
             if len(paper_questions) >= max_questions_per_paper:
@@ -218,11 +209,10 @@ def generate_test_samples(  # noqa: C901
             indices = cat_to_indices[cat]
             if not indices:
                 continue
-            # Choose the chunk with the most text to ensure sufficient answer length
             chosen_idx = max(indices, key=lambda i: len(chunks[i].get("text", "")))
             chunk = chunks[chosen_idx]
             answer_text = chunk.get("text", "").strip()
-            if len(answer_text) < 20:  # noqa: PLR2004 (skip very short chunks)
+            if len(answer_text) < 20:  # noqa: PLR2004
                 continue
             question = random.choice(templates[cat]).format(title=title)
             paper_questions.append(
@@ -234,7 +224,6 @@ def generate_test_samples(  # noqa: C901
                 }
             )
 
-        # Limit to max_questions_per_paper
         samples.extend(paper_questions[:max_questions_per_paper])
 
     return samples
@@ -257,7 +246,6 @@ def generate_test_data(
         raise ValueError("No chunks found. Run ingestion first")
 
     metadata_map_raw = load_metadata_from_minio(bucket_name, metadata_dir, s3_client)
-    # Normalize metadata keys: strip version suffixes to match chunk IDs
     metadata_map = {
         normalize_arxiv_id(paper.get("arxiv_id", "")): paper
         for paper in metadata_map_raw.values()

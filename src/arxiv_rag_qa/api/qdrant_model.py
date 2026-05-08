@@ -8,6 +8,8 @@ class QdrantRequest(BaseModel):
     vector_size: int
     bucket_name: str
     embedding_dir: str
+    chunk_dir: str = ""
+    retriever_type: str = "dense"
     timeout: int
     batch_size: int
 
@@ -19,4 +21,6 @@ class QdrantResponse(BaseModel):
     vector_size: int
     bucket_name: str
     embedding_dir: str
+    chunk_dir: str = ""
+    retriever_type: str = "dense"
     batch_size: int

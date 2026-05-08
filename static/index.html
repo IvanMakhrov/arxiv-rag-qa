@@ -3,75 +3,632 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📚 ArXiv RAG QA</title>
+    <title>📚 ArXiv RAG QA - Intelligent Question Answering</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <!-- ✅ Подключение CSS -->
-    <link rel="stylesheet" href="/static/styles.css">
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #1a1a2e;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Header Styles */
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            color: #ffffff;
+            opacity: 0.9;
+        }
+
+        /* Main Card */
+        .main-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            animation: fadeInUp 0.8s ease;
+        }
+
+        /* Form Styles */
+        .query-form {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2d3748;
+            font-size: 1rem;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-family: 'Inter', monospace;
+            font-size: 0.95rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+            background: #f7fafc;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            background: white;
+        }
+
+        /* Button Styles */
+        .send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            background: #f7fafc;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            color: #4a5568;
+            font-size: 0.95rem;
+        }
+
+        /* Response Section */
+        .response-section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .response-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .response-header h2 {
+            font-size: 1.5rem;
+            color: #2d3748;
+        }
+
+        .response-content {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+            color: #2d3748;
+            font-size: 1rem;
+        }
+
+        /* Sources */
+        .sources {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .sources h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .sources-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .source-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s;
+        }
+
+        .source-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .source-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .source-score {
+            display: inline-block;
+            background: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: #4a5568;
+            margin-bottom: 8px;
+        }
+
+        .source-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .source-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Actions */
+        .actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #4a5568;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e0;
+            transform: translateY(-1px);
+        }
+
+        /* Error Message */
+        .error-msg {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.85rem;
+        }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            .main-card {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .btn-secondary, .send-btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>📚 ArXiv RAG QA</h1>
-            <p>Задайте вопрос по научным статьям</p>
+            <h1><i class="fas fa-graduation-cap"></i> ArXiv RAG QA</h1>
+            <p>Intelligent Question Answering System powered by Retrieval-Augmented Generation</p>
         </header>
 
-        <main>
-            <!-- Форма отправки запроса -->
-            <form method="POST" action="/get-response" class="query-form">
-                <div class="input-group">
-                    <label for="query">Ваш вопрос:</label>
-                    <textarea
-                        id="query"
-                        name="query"
-                        rows="4"
-                        placeholder="Например: What are the main methods for document chunking in RAG systems?"
-                        required
-                        maxlength="2000"
-                    >{{ query if query else '' }}</textarea>
-                    {% if error %}
-                        <p class="error-msg">{{ error }}</p>
-                    {% endif %}
+        <div class="main-card">
+            <main>
+                <!-- Form -->
+                <form id="queryForm" class="query-form">
+                    <div class="input-group">
+                        <label for="query">
+                            <i class="fas fa-question-circle"></i> Your Question
+                        </label>
+                        <textarea
+                            id="query"
+                            name="query"
+                            rows="4"
+                            placeholder="e.g., What are the main methods for document chunking in RAG systems? How does dense retrieval compare to sparse retrieval?"
+                            required
+                            maxlength="2000"
+                        ></textarea>
+                    </div>
+                    <div id="errorMsg" class="error-msg"></div>
+                    <button type="submit" id="submitBtn" class="send-btn">
+                        <i class="fas fa-paper-plane"></i> Send Query
+                    </button>
+                </form>
+
+                <!-- Loading -->
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <p><i class="fas fa-brain"></i> Processing your query with AI...</p>
+                    <p style="font-size: 0.85rem; margin-top: 10px;">This may take a few seconds</p>
                 </div>
 
-                <div class="form-options">
-                    <label>
-                        <input type="checkbox" name="use_hybrid" value="on" {% if not query or use_hybrid %}checked{% endif %}>
-                        Использовать гибридный ретривер
-                    </label>
-                    <label>
-                        Top-K:
-                        <select name="top_k">
-                            <option value="3" {% if top_k == 3 %}selected{% endif %}>3</option>
-                            <option value="5" {% if not top_k or top_k == 5 %}selected{% endif %}>5</option>
-                            <option value="10" {% if top_k == 10 %}selected{% endif %}>10</option>
-                        </select>
-                    </label>
+                <!-- Response -->
+                <div id="responseSection" class="response-section">
+                    <div class="response-header">
+                        <i class="fas fa-robot" style="font-size: 1.5rem; color: #667eea;"></i>
+                        <h2>Answer</h2>
+                    </div>
+                    <div id="responseContent" class="response-content"></div>
+                    <div id="sourcesSection"></div>
+                    <div class="actions">
+                        <button onclick="clearResponse()" class="btn-secondary">
+                            <i class="fas fa-trash-alt"></i> Clear Answer
+                        </button>
+                        <button onclick="copyResponse()" class="btn-secondary">
+                            <i class="fas fa-copy"></i> Copy to Clipboard
+                        </button>
+                    </div>
                 </div>
-
-                <!-- Скрытые поля конфигурации -->
-                <input type="hidden" name="emb_model_name" value="sentence-transformers/all-MiniLM-L6-v2">
-                <input type="hidden" name="collection_name" value="arxiv_rag">
-                <input type="hidden" name="gen_model_name" value="Qwen/Qwen2.5-0.5B-Instruct">
-                <input type="hidden" name="qdrant_host" value="qdrant">
-                <input type="hidden" name="qdrant_port" value="6333">
-
-                <button type="submit" class="send-btn">🔍 Отправить запрос</button>
-            </form>
-
-            <!-- Блок ответа (если есть) -->
-            {% if response %}
-            <section class="response-section">
-                <h2>📄 Ответ:</h2>
-                <div class="response-content">
-                    <p>{{ response.answer or response.response }}</p>
-                </div>
-            </section>
-            {% endif %}
-        </main>
+            </main>
+        </div>
 
         <footer>
-            <p>RAG System • Powered by FastAPI + nginx</p>
+            <p><i class="fas fa-robot"></i> RAG System • Powered by FastAPI, Qdrant, and LLM</p>
         </footer>
     </div>
+
+    <script>
+        const form = document.getElementById('queryForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loading = document.getElementById('loading');
+        const responseSection = document.getElementById('responseSection');
+        const responseContent = document.getElementById('responseContent');
+        const sourcesSection = document.getElementById('sourcesSection');
+        const errorMsg = document.getElementById('errorMsg');
+        let pollingInterval = null;
+
+        function clearResponse() {
+            responseSection.style.display = 'none';
+            responseContent.innerHTML = '';
+            sourcesSection.innerHTML = '';
+            errorMsg.style.display = 'none';
+            errorMsg.innerHTML = '';
+        }
+
+        function copyResponse() {
+            const text = responseContent.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target.closest('.btn-secondary');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
+        async function pollTaskStatus(taskId) {
+            let attempts = 0;
+            const maxAttempts = 60;
+
+            stopPolling();
+
+            pollingInterval = setInterval(async () => {
+                attempts++;
+
+                try {
+                    const response = await fetch(`/tasks/${taskId}`);
+                    const data = await response.json();
+
+                    if (data.status === 'completed') {
+                        stopPolling();
+                        loading.style.display = 'none';
+                        submitBtn.disabled = false;
+
+                        let result = data.result;
+                        if (typeof result === 'string') {
+                            try {
+                                result = JSON.parse(result);
+                            } catch(e) {
+                                result = { answer: result };
+                            }
+                        }
+
+                        const answer = result.answer || result.response || 'No answer received';
+                        responseContent.innerHTML = marked.parse(answer);
+
+                        if (result.sources && result.sources.length > 0) {
+                            let sourcesHtml = `
+                                <div class="sources">
+                                    <h3><i class="fas fa-book-open"></i> Sources (${result.sources.length})</h3>
+                                    <div class="sources-list">
+                            `;
+                            result.sources.forEach(source => {
+                                const arxivId = source.arxiv_id || source.get?.('arxiv_id') || '?';
+                                const score = source.score || source.get?.('score') || 0;
+                                const url = source.url || source.get?.('url') || `https://arxiv.org/abs/${arxivId}`;
+                                const title = source.title || `arXiv:${arxivId}`;
+
+                                sourcesHtml += `
+                                    <div class="source-item">
+                                        <div class="source-title">${escapeHtml(title)}</div>
+                                        <div class="source-score"><i class="fas fa-chart-line"></i> Relevance Score: ${typeof score === 'number' ? score.toFixed(3) : score}</div>
+                                        <a href="${url}" class="source-link" target="_blank" rel="noopener">
+                                            <i class="fas fa-external-link-alt"></i> ${url}
+                                        </a>
+                                    </div>
+                                `;
+                            });
+                            sourcesHtml += `</div></div>`;
+                            sourcesSection.innerHTML = sourcesHtml;
+                        }
+
+                        responseSection.style.display = 'block';
+
+                    } else if (data.status === 'failed') {
+                        stopPolling();
+                        loading.style.display = 'none';
+                        submitBtn.disabled = false;
+                        showError(data.error || 'Processing failed');
+
+                    } else if (attempts >= maxAttempts) {
+                        stopPolling();
+                        loading.style.display = 'none';
+                        submitBtn.disabled = false;
+                        showError('Request timeout. Please try again.');
+
+                    } else {
+                        const statusText = {
+                            'pending': 'Queued',
+                            'processing': 'Processing with AI'
+                        }[data.status] || data.status;
+
+                        document.getElementById('loading').innerHTML = `
+                            <div class="spinner"></div>
+                            <p><i class="fas fa-hourglass-half"></i> ${statusText}...</p>
+                            <p style="font-size: 0.85rem; margin-top: 10px;">Please wait</p>
+                        `;
+                    }
+
+                } catch (err) {
+                    console.error('Polling error:', err);
+                    if (attempts >= maxAttempts) {
+                        stopPolling();
+                        loading.style.display = 'none';
+                        submitBtn.disabled = false;
+                        showError('Connection error. Please try again.');
+                    }
+                }
+            }, 3000);
+        }
+
+        function showError(message) {
+            errorMsg.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+            errorMsg.style.display = 'flex';
+            setTimeout(() => {
+                errorMsg.style.display = 'none';
+            }, 5000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            clearResponse();
+            stopPolling();
+
+            const query = document.getElementById('query').value.trim();
+            if (!query) {
+                showError('Please enter your question');
+                return;
+            }
+
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+
+            const formData = new URLSearchParams();
+            formData.append('query', query);
+            formData.append('top_k', '7');
+            formData.append('emb_model_name', 'sentence-transformers/all-MiniLM-L6-v2');
+            formData.append('collection_name', 'hybrid');
+            formData.append('gen_model_name', 'Qwen/Qwen2.5-0.5B-Instruct');
+            formData.append('qdrant_host', 'qdrant');
+            formData.append('qdrant_port', '6333');
+            formData.append('retriever_type', 'dense');
+            formData.append('sparse_method', 'bm25');
+            formData.append('use_qdrant_corpus', 'true');
+            formData.append('in_memory', 'false');
+            formData.append('hybrid_config', '{}');
+            formData.append('sparse_params', '{}');
+            formData.append('embedding_model', 'all-MiniLM-L6-v2');
+
+            try {
+                const response = await fetch('/get-response-json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.task_id) {
+                    await pollTaskStatus(data.task_id);
+                } else {
+                    throw new Error('No task ID received');
+                }
+
+            } catch (err) {
+                console.error('Error:', err);
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+                showError(err.message);
+            }
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </body>
 </html>

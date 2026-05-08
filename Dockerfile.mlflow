@@ -1,15 +1,11 @@
 FROM ghcr.io/mlflow/mlflow:v2.15.1
 
-# Install required dependencies
 RUN pip install --no-cache-dir boto3 psycopg2-binary
 
-# Set working directory
 WORKDIR /mlflow
 
-# Expose MLflow server port
 EXPOSE 5000
 
-# Default command to start MLflow server
 CMD ["mlflow", "server", \
      "--host", "0.0.0.0", \
      "--port", "5000", \

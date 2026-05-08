@@ -2,8 +2,6 @@ eval:
   bertscore_model: roberta-base
   llm_judge:
     enabled: true
-    api_base: ${oc.env:OPENROUTER_API_BASE,https://openrouter.ai/api/v1}
-    api_key: ${oc.env:OPENROUTER_API_KEY}
-    model: ${oc.env:OPENROUTER_MODEL}
+    model: ${experiments.generator.model_name}
     timeout: 30
     max_retries: 3

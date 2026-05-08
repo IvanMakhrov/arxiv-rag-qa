@@ -2,13 +2,16 @@ import json
 import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import BaseLoader, Environment, TemplateNotFound
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from starlette.templating import _TemplateResponse
 
 from arxiv_rag_qa.api.data_model import (
     ChunkRequest,
@@ -16,7 +19,6 @@ from arxiv_rag_qa.api.data_model import (
     EmbeddingsRequest,
     ParseRequest,
     TaskListResponse,
-    TaskStatusResponse,
     TestDataRequest,
 )
 from arxiv_rag_qa.api.eval_model import (
@@ -25,56 +27,152 @@ from arxiv_rag_qa.api.eval_model import (
 )
 from arxiv_rag_qa.api.middleware import LatencyMiddleware
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest
+from arxiv_rag_qa.api.rag_model import RagRequest
 from arxiv_rag_qa.celery_config import celery_app
 from arxiv_rag_qa.db.models import Base, TaskStatus
 from utils.setup_logger import setup_logger
 
-# Logging setup
 logger = setup_logger(__name__)
 
-# Database setup
 DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
-# Создание таблиц
 Base.metadata.create_all(bind=engine)
 
-# Production settings
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-# FastAPI setup
+STATIC_DIR = "/app/static"
+
+
+class DirectFileLoader(BaseLoader):
+    """Loader that bypasses Jinja2's internal splitting logic"""
+
+    def __init__(self, searchpath):
+        self.searchpath = searchpath
+
+    def get_source(self, environment, template):
+        if not isinstance(template, str):
+            template = str(template)
+
+        template = template.lstrip("/")
+
+        filepath = Path(self.searchpath) / template
+
+        if not filepath.exists():
+            raise TemplateNotFound(template)
+
+        with Path.open(filepath, encoding="utf-8") as f:
+            source = f.read()
+
+        return source, str(filepath), lambda: True
+
+
+loader = DirectFileLoader(STATIC_DIR)
+jinja_env = Environment(
+    loader=loader,
+    autoescape=True,
+    cache_size=0,
+)
+templates = Jinja2Templates(env=jinja_env)
+
+try:
+    test = jinja_env.get_template("index.html")
+    print("Template engine works")
+except Exception as e:
+    print(f"Template error: {e}")
+
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+
 app = FastAPI(
     title="RAG Service with Async Tasks",
     debug=DEBUG,
-    docs_url=None if not DEBUG else "/docs",  # Disable Swagger in production
+    docs_url=None if not DEBUG else "/docs",
     redoc_url=None if not DEBUG else "/redoc",
 )
 app.add_middleware(LatencyMiddleware)
 
-# Mount static files (nginx will handle this, but keep for local dev)
 if DEBUG:
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-templates = Jinja2Templates(directory="static")
+
+class SafeFileSystemLoader(BaseLoader):
+    """A safe file system loader that ensures template names are strings"""
+
+    def __init__(self, searchpath):
+        self.searchpath = searchpath
+
+    def get_source(self, environment, template):
+        if not isinstance(template, str):
+            template = str(template)
+
+        template = template.lstrip("/")
+
+        template_path = Path(self.searchpath) / template
+
+        if not template_path.exists():
+            raise TemplateNotFound(template)
+
+        with Path.open(template_path, encoding="utf-8") as f:
+            source = f.read()
+
+        return source, template_path, lambda: template_path.stat().st_mtime
+
+    def list_templates(self):
+        """List all templates in the directory"""
+        templates = []
+        for entry in Path(self.searchpath).iterdir():
+            if entry.suffix == ".html":
+                templates.append(entry.name)
+        return templates
+
+
+class SafeTemplateResponse(_TemplateResponse):
+    """Custom TemplateResponse that avoids caching issues"""
+
+    def __init__(
+        self, template, context, status_code=200, headers=None, media_type=None, background=None
+    ):
+        clean_context = {}
+        for key, value in context.items():
+            if key == "request" or not isinstance(value, dict):
+                clean_context[key] = value
+        super().__init__(template, clean_context, status_code, headers, media_type, background)
 
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Serve main page"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        template = jinja_env.get_template("index.html")
+        content = template.render(request=request)
+        return HTMLResponse(content=content)
+    except Exception as e:
+        logger.error(f"Error rendering template: {e}", exc_info=True)
+        with Path.open(Path(STATIC_DIR) / "index.html", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+
+
+_RAG_DEFAULTS = {name: field.default for name, field in RagRequest.model_fields.items()}
 
 
 @app.post("/get-response", response_class=HTMLResponse)
-async def get_rag_response(
+async def get_rag_response(  # noqa: PLR0913
     request: Request,
     query: str = Form(..., min_length=1, max_length=2000),
-    top_k: int = Form(5, ge=1, le=50),
-    emb_model_name: str = Form("all-MiniLM-L6-v2"),
-    collection_name: str = Form("arxiv_rag"),
-    gen_model_name: str = Form("Qwen/Qwen2.5-0.5B-Instruct"),
-    qdrant_host: str = Form("qdrant"),
-    qdrant_port: int = Form(6333),
+    top_k: int = Form(_RAG_DEFAULTS["top_k"], ge=1, le=50),
+    emb_model_name: str = Form(_RAG_DEFAULTS["emb_model_name"]),
+    collection_name: str = Form(_RAG_DEFAULTS["collection_name"]),
+    gen_model_name: str = Form(_RAG_DEFAULTS["gen_model_name"]),
+    qdrant_host: str = Form(_RAG_DEFAULTS["qdrant_host"]),
+    qdrant_port: int = Form(_RAG_DEFAULTS["qdrant_port"]),
+    retriever_type: str = Form(_RAG_DEFAULTS["retriever_type"], pattern="^(dense|sparse|hybrid)$"),
+    sparse_method: str = Form(_RAG_DEFAULTS["sparse_method"], pattern="^(bm25|tfidf)$"),
+    use_qdrant_corpus: bool = Form(_RAG_DEFAULTS["use_qdrant_corpus"]),
+    in_memory: bool = Form(_RAG_DEFAULTS["in_memory"]),
+    hybrid_config: str = Form("{}"),
+    sparse_params: str = Form("{}"),
+    embedding_model: str = Form(_RAG_DEFAULTS["embedding_model"]),
 ):
     """
     Асинхронный RAG-запрос через HTML-форму.
@@ -104,6 +202,13 @@ async def get_rag_response(
             "query": query,
             "qdrant_host": qdrant_host,
             "qdrant_port": qdrant_port,
+            "retriever_type": retriever_type,
+            "sparse_method": sparse_method,
+            "use_qdrant_corpus": use_qdrant_corpus,
+            "in_memory": in_memory,
+            "hybrid_config": json.loads(hybrid_config),
+            "sparse_params": json.loads(sparse_params),
+            "embedding_model": embedding_model,
         }
 
         celery_app.send_task("get_rag_response", args=[task_data], task_id=task_id)
@@ -120,42 +225,102 @@ async def get_rag_response(
         )
 
 
-@app.get("/task/{task_id}", response_class=HTMLResponse)
-async def task_status_page(request: Request, task_id: str):
+@app.get("/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    """Get task status - simplified without response model"""
     try:
         db = SessionLocal()
         task = db.query(TaskStatus).filter(TaskStatus.id == task_id).first()
         db.close()
 
         if not task:
-            raise HTTPException(status_code=404, detail="Задача не найдена")
-
-        refresh_seconds = 3 if task.status in ["pending", "processing"] else 0
+            raise HTTPException(status_code=404, detail="Task not found")
 
         result = None
         if task.status == "completed" and task.result:
             try:
                 result = json.loads(task.result) if isinstance(task.result, str) else task.result
-            except Exception:
-                result = {"answer": task.result, "sources": []}
+            except Exception as e:
+                logger.error(f"Error parsing result: {e}")
+                result = {"answer": str(task.result), "sources": []}
 
-        return templates.TemplateResponse(
-            "task_status.html",
-            {
-                "request": request,
-                "task_id": task_id,
-                "task": task,
-                "result": result,
-                "refresh_seconds": refresh_seconds,
-                "query": task.query,
-            },
-        )
+        return {
+            "id": task.id,
+            "status": task.status,
+            "task_type": task.task_type,
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+            "started_at": task.started_at.isoformat() if task.started_at else None,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "result": result,
+            "error": task.error,
+        }
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to render task status: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Ошибка загрузки статуса: {e!s}") from e
+        logger.error(f"Failed to get task status: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/get-response-json")
+async def get_rag_response_json(  # noqa: PLR0913
+    query: str = Form(..., min_length=1, max_length=2000),
+    top_k: int = Form(_RAG_DEFAULTS["top_k"], ge=1, le=50),
+    emb_model_name: str = Form(_RAG_DEFAULTS["emb_model_name"]),
+    collection_name: str = Form(_RAG_DEFAULTS["collection_name"]),
+    gen_model_name: str = Form(_RAG_DEFAULTS["gen_model_name"]),
+    qdrant_host: str = Form(_RAG_DEFAULTS["qdrant_host"]),
+    qdrant_port: int = Form(_RAG_DEFAULTS["qdrant_port"]),
+    retriever_type: str = Form(_RAG_DEFAULTS["retriever_type"]),
+    sparse_method: str = Form(_RAG_DEFAULTS["sparse_method"]),
+    use_qdrant_corpus: bool = Form(_RAG_DEFAULTS["use_qdrant_corpus"]),
+    in_memory: bool = Form(_RAG_DEFAULTS["in_memory"]),
+    hybrid_config: str = Form("{}"),
+    sparse_params: str = Form("{}"),
+    embedding_model: str = Form(_RAG_DEFAULTS["embedding_model"]),
+):
+    """JSON endpoint for async form submission"""
+    try:
+        task_id = str(uuid.uuid4())
+
+        db = SessionLocal()
+        task = TaskStatus(
+            id=task_id,
+            task_type="get_rag_response",
+            status="pending",
+            created_at=datetime.utcnow(),
+            query=query,
+        )
+        db.add(task)
+        db.commit()
+        db.close()
+
+        task_data = {
+            "emb_model_name": emb_model_name,
+            "collection_name": collection_name,
+            "top_k": top_k,
+            "gen_model_name": gen_model_name,
+            "query": query,
+            "qdrant_host": qdrant_host,
+            "qdrant_port": qdrant_port,
+            "retriever_type": retriever_type,
+            "sparse_method": sparse_method,
+            "use_qdrant_corpus": use_qdrant_corpus,
+            "in_memory": in_memory,
+            "hybrid_config": json.loads(hybrid_config),
+            "sparse_params": json.loads(sparse_params),
+            "embedding_model": embedding_model,
+        }
+
+        celery_app.send_task("get_rag_response", args=[task_data], task_id=task_id)
+
+        logger.info(f"RAG query task queued: {task_id}, query: {query[:100]}...")
+
+        return {"task_id": task_id, "status": "pending"}
+
+    except Exception as e:
+        logger.error(f"Failed to queue RAG query task: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/health")
@@ -333,6 +498,8 @@ async def qdrant_setup(request: QdrantRequest):
             "vector_size": request.vector_size,
             "bucket_name": request.bucket_name,
             "embedding_dir": request.embedding_dir,
+            "chunk_dir": request.chunk_dir,
+            "retriever_type": request.retriever_type,
             "timeout": request.timeout,
             "batch_size": request.batch_size,
         }
@@ -415,6 +582,11 @@ async def eval_retriever(request: RetrieverEvalRequest):
             "model_name": request.model_name,
             "qdrant_host": request.qdrant_host,
             "qdrant_port": request.qdrant_port,
+            "retriever_type": request.retriever_type,
+            "sparse_method": request.sparse_method,
+            "use_qdrant_corpus": request.use_qdrant_corpus,
+            "hybrid_config": request.hybrid_config,
+            "sparse_params": request.sparse_params,
         }
 
         celery_app.send_task("evaluate_retriever", args=[task_data], task_id=task_id)
@@ -457,6 +629,12 @@ async def eval_generator(request: GeneratorEvalRequest):
             "bertscore_model": request.bertscore_model,
             "qdrant_host": request.qdrant_host,
             "qdrant_port": request.qdrant_port,
+            "llm_judge_model": request.llm_judge_model,
+            "retriever_type": request.retriever_type,
+            "sparse_method": request.sparse_method,
+            "use_qdrant_corpus": request.use_qdrant_corpus,
+            "hybrid_config": request.hybrid_config,
+            "sparse_params": request.sparse_params,
         }
 
         celery_app.send_task("evaluate_generator", args=[task_data], task_id=task_id)
@@ -470,29 +648,6 @@ async def eval_generator(request: GeneratorEvalRequest):
 
     except Exception as e:
         logger.error(f"Failed to queue generator evaluation task: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-# ===== Эндпоинты для отслеживания статуса задач =====
-
-
-@app.get("/tasks/{task_id}", response_model=TaskStatusResponse)
-async def get_task_status(task_id: str):
-    """Получить статус конкретной задачи"""
-    try:
-        db = SessionLocal()
-        task = db.query(TaskStatus).filter(TaskStatus.id == task_id).first()
-        db.close()
-
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-
-        return TaskStatusResponse(**task.to_dict())
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get task status: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

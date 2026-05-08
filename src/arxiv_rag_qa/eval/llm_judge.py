@@ -1,11 +1,9 @@
 import json
-import os
 import re
 from typing import Any, ClassVar
 
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from utils.setup_logger import setup_logger
 
@@ -13,7 +11,7 @@ logger = setup_logger(__name__)
 
 
 class LLMJudge:
-    """LLM Judge for evaluating RAG outputs using OpenRouter."""
+    """LLM Judge for evaluating RAG outputs using a local model."""
 
     MAX_SCORE: ClassVar[int] = 5
     PROMPTS: ClassVar[dict[str, str]] = {
@@ -27,16 +25,6 @@ class LLMJudge:
         Question: {question}
         Answer: {answer}
         """,
-        "answer_correctness": """You are an expert evaluator for factual accuracy.
-        Compare the predicted answer with the ground truth and rate factual correctness.
-        IMPORTANT: Output ONLY a valid JSON object with exactly this key:
-        "score": <integer between 1 and 5>
-        Do not include any additional text, reasoning, or explanations outside the JSON.
-
-        Question: {question}
-        Ground Truth: {ground_truth}
-        Prediction: {prediction}
-        """,
         "faithfulness": """You are an expert evaluator for faithfulness/grounding.
         Verify whether all claims in the answer are supported by the provided context.
         IMPORTANT: Output ONLY a valid JSON object with exactly this key:
@@ -46,49 +34,49 @@ class LLMJudge:
         Context: {context}
         Answer: {answer}
         """,
-        "conciseness": """You are an expert evaluator for answer conciseness.
-        Evaluate whether the answer is appropriately concise without unnecessary information.
+        "context_relevance": """You are an expert evaluator for context relevance in
+        question-answering systems.
+        Evaluate how relevant and complete the retrieved context is for answering the question.
+        Consider both whether the context contains the information needed to answer the question
+        and whether it provides sufficient detail and completeness.
+
         IMPORTANT: Output ONLY a valid JSON object with exactly this key:
         "score": <integer between 1 and 5>
         Do not include any additional text, reasoning, or explanations outside the JSON.
 
         Question: {question}
-        Answer: {answer}
+        Context: {context}
         """,
     }
 
     def __init__(
         self,
-        api_key: str | None = None,
-        api_base: str | None = None,
         model: str | None = None,
+        device: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
     ):
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        self.api_base = api_base or os.getenv("OPENROUTER_API_BASE", "https://openrouter.ai/api/v1")
-        self.model = model or os.getenv("OPENROUTER_MODEL")
+        self.model = model
         self.timeout = timeout
         self.max_retries = max_retries
 
-        if not self.api_key:
-            raise ValueError(
-                "OpenRouter API key not configured. Set OPENROUTER_API_KEY environment variable "
-                "or pass api_key parameter."
+        if not self.model:
+            raise ValueError("Model not configured. Set model parameter or pass model name.")
+
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+        logger.info(f"Loading model: {self.model}")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model)
+            self.model_obj = AutoModelForCausalLM.from_pretrained(
+                self.model,
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                device_map="auto" if self.device == "cuda" else None,
             )
-
-        self.session = requests.Session()
-        retry_strategy = Retry(
-            total=max_retries,
-            backoff_factor=1,
-            status_forcelist=[429, 502, 503, 504],
-            allowed_methods=["POST"],
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("https://", adapter)
-        self.session.mount("http://", adapter)
-
-        logger.info(f"LLM Judge initialized with model: {self.model}")
+            logger.info(f"LLM Judge initialized with model: {self.model}")
+        except Exception as e:
+            logger.error(f"Failed to load model {self.model}: {e}")
+            raise
 
     @staticmethod
     def extract_json_from_text(text: str) -> str:  # noqa: C901, PLR0911, PLR0912, PLR0915
@@ -186,94 +174,44 @@ class LLMJudge:
 
         return ""
 
-    def _call_llm(self, prompt: str) -> dict[str, Any]:  # noqa: C901
-        """Make API call to OpenRouter and parse JSON response."""
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
-
-        data = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.0,
-            "max_tokens": 4096,
-            "stream": False,
-        }
-
+    def _call_llm(self, prompt: str) -> dict[str, Any]:
+        """Generate response using local model."""
         try:
-            response = self.session.post(
-                f"{self.api_base}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=self.timeout,
+            formatted_prompt = (
+                "System: You are a helpful assistant that evaluates responses.\n\n"
+                f"Human: {prompt}\n\nAssistant:"
             )
-            response.raise_for_status()
-            result = response.json()
 
-            if "choices" not in result or not result["choices"]:
-                logger.error(f"Invalid API response: missing 'choices' or empty: {result}")
-                raise ValueError("Invalid API response: missing 'choices' or empty")
+            inputs = self.tokenizer(formatted_prompt, return_tensors="pt").to(self.device)
 
-            if "message" not in result["choices"][0]:
-                logger.error(f"Invalid API response: missing 'message' in first choice: {result}")
-                raise ValueError("Invalid API response: missing 'message' in first choice")
-
-            message = result["choices"][0]["message"]
-            content = message.get("content")
-
-            if content is None:
-                content = (
-                    message.get("thinking")
-                    or message.get("reasoning")
-                    or message.get("reasoning_content")
+            with torch.no_grad():
+                outputs = self.model_obj.generate(
+                    **inputs,
+                    max_new_tokens=4096,
+                    temperature=0.0,
+                    do_sample=False,
+                    pad_token_id=self.tokenizer.eos_token_id,
                 )
-                if content:
-                    finish_reason = result["choices"][0].get("finish_reason")
-                    logger.info(
-                        f"Using content from 'reasoning' field "
-                        f"(content was None, finish_reason: {finish_reason})"
-                    )
-                else:
-                    logger.warning(
-                        f"LLM returned None content and no reasoning fallback."
-                        f" Full response: {result}"
-                    )
-                    raise ValueError("LLM returned empty content (None) with no reasoning fallback")
 
-            if not isinstance(content, str):
-                logger.warning(
-                    f"LLM returned non-string content type: {type(content)}, content: {content}"
-                )
-                raise ValueError(f"LLM returned non-string content: {type(content)}")
+            response_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-            if not content.strip():
-                logger.warning(f"LLM returned empty/whitespace-only content: '{content}'")
-                raise ValueError("LLM returned empty or whitespace-only content")
+            if "Assistant:" in response_text:
+                response_text = response_text.split("Assistant:")[1].strip()
 
-            try:
-                json_str = LLMJudge.extract_json_from_text(content)
-                if not json_str:
-                    logger.warning(f"Failed to extract JSON from content: {content}")
-                    raise ValueError("No JSON found in LLM response")
-                return json.loads(json_str)
-            except json.JSONDecodeError as e:
-                logger.error(
-                    f"Failed to parse LLM response as JSON. "
-                    f"Extracted: '{json_str}'. "
-                    f"Original: {content}"
-                )
-                raise ValueError(f"Invalid JSON response from LLM: {e}") from e
+            if not response_text:
+                logger.warning("LLM returned empty response")
+                raise ValueError("LLM returned empty response")
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"OpenRouter API call failed: {e}")
+            json_str = self.extract_json_from_text(response_text)
+            if not json_str:
+                logger.warning(f"Failed to extract JSON from content: {response_text}")
+                raise ValueError("No JSON found in LLM response")
+
+            return json.loads(json_str)
+
+        except Exception as e:
+            logger.error(f"LLM call failed: {e}")
             raise
-        except (KeyError, IndexError) as e:
-            logger.error(
-                f"Unexpected API response structure: "
-                f"{result if 'result' in locals() else 'No result'}. Error: {e}"
-            )
-            raise ValueError(f"Invalid API response structure: {e}") from e
 
     def evaluate(
         self,
@@ -290,11 +228,10 @@ class LLMJudge:
             "answer_relevance": self.PROMPTS["answer_relevance"].format(
                 question=question, answer=prediction
             ),
-            "answer_correctness": self.PROMPTS["answer_correctness"].format(
-                question=question, ground_truth=ground_truth, prediction=prediction
-            ),
             "faithfulness": self.PROMPTS["faithfulness"].format(context=context, answer=prediction),
-            "conciseness": self.PROMPTS["conciseness"].format(question=question, answer=prediction),
+            "context_relevance": self.PROMPTS["context_relevance"].format(
+                question=question, context=context
+            ),
         }
 
         prompt = prompt_templates[metric]
@@ -312,12 +249,10 @@ def evaluate_llm_metrics(  # noqa: C901, PLR0912
     ground_truths: list[str] | None = None,
     contexts: list[str] | None = None,
     metrics: list[str] | None = None,
-    api_key: str | None = None,
-    api_base: str | None = None,
     model: str | None = None,
 ) -> dict[str, float]:
     if metrics is None:
-        metrics = ["answer_relevance", "answer_correctness", "faithfulness", "conciseness"]
+        metrics = ["answer_relevance", "faithfulness", "context_relevance"]
 
     if not predictions or not questions:
         return {}
@@ -332,7 +267,7 @@ def evaluate_llm_metrics(  # noqa: C901, PLR0912
         return {}
 
     try:
-        judge = LLMJudge(api_key=api_key, api_base=api_base, model=model)
+        judge = LLMJudge(model=model)
     except ValueError as e:
         logger.warning(f"LLM Judge not available: {e}. Skipping LLM metrics.")
         return {}

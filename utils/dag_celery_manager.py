@@ -72,17 +72,17 @@ def wait_for_task(
                 )
                 if retries < max_retries:
                     retries += 1
-                    print(f"⚠️  Task failed, retrying ({retries}/{max_retries}): {error}")
+                    print(f"Task failed, retrying ({retries}/{max_retries}): {error}")
                     time.sleep(retry_delay)
                     continue
                 raise AirflowException(f"Task failed after {max_retries} retries: {error}")
 
             time.sleep(poll_interval)
         except Exception as e:
-            print(f"⚠️  Polling error: {e!s}")
+            print(f"Polling error: {e!s}")
             if retries < max_retries:
                 retries += 1
-                print(f"⚠️  Polling error, retrying ({retries}/{max_retries})")
+                print(f"Polling error, retrying ({retries}/{max_retries})")
                 time.sleep(retry_delay)
             else:
                 time.sleep(poll_interval)
@@ -98,21 +98,34 @@ def log_task_to_mlflow(
     task_instance = context["task_instance"]
     upstream_task_id = task_instance.task_id.replace("log_", "wait_")
 
-    full_response = task_instance.xcom_pull(task_ids=upstream_task_id, key="task_full_response")
+    try:
+        full_response = task_instance.xcom_pull(task_ids=upstream_task_id, key="task_full_response")
 
-    data = json.loads(full_response["result_data"])
+        if not full_response or "result_data" not in full_response:
+            print(f"No valid response data found for task {upstream_task_id}")
+            http_response = {"params": {}, "metrics": {}}
+        else:
+            data = json.loads(full_response["result_data"])
+            params = {k: v for k, v in data.items() if k != "results"}
+            metrics = data.get("results", {}).get("metrics", {})
+            http_response = {"params": params, "metrics": metrics}
 
-    params = {k: v for k, v in data.items() if k != "results"}
-    metrics = data.get("results", {}).get("metrics", {})
+    except Exception as e:
+        print(f"Error parsing task data for MLflow: {e}")
+        http_response = {"params": {}, "metrics": {}}
 
-    http_response = {"params": params, "metrics": metrics}
-
-    task_id = full_response["id"]
-    run_id = log_to_mlflow(
-        task_id=task_id,
-        http_response=http_response,
-        experiment_name=experiment_name,
-        run_name=task_stage,
-        stage=task_stage,
-    )
-    task_instance.xcom_push(key="mlflow_run_id", value=run_id)
+    try:
+        task_id = full_response["id"] if full_response else "unknown"
+        run_id = log_to_mlflow(
+            task_id=task_id,
+            http_response=http_response,
+            experiment_name=experiment_name,
+            run_name=task_stage,
+            stage=task_stage,
+        )
+        task_instance.xcom_push(key="mlflow_run_id", value=run_id)
+        return run_id
+    except Exception as e:
+        print(f"Failed to log to MLflow: {e}")
+        task_instance.xcom_push(key="mlflow_run_id", value="failed")
+        return "failed"

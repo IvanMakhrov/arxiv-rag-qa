@@ -10,14 +10,14 @@ class TaskStatus(Base):
     __tablename__ = "task_status"
 
     id = Column(String, primary_key=True)
-    task_type = Column(String, nullable=False)  # download, parse, chunk, etc.
-    status = Column(String, default="pending")  # pending, processing, completed, failed
+    task_type = Column(String, nullable=False)
+    status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
     error_message = Column(Text)
-    result_data = Column(Text)  # JSON string with task results
-    progress = Column(Integer, default=0)  # 0-100
+    result_data = Column(Text)
+    progress = Column(Integer, default=0)
     query = Column(Text, nullable=True)
     result = Column(JSON, nullable=True)
     error = Column(Text, nullable=True)

@@ -1,5 +1,36 @@
 mlflow:
-  experiment_name: baseline
+  experiment_name: hybrid
+
+embeddings:
+  embedding_dir: ${experiments.mlflow.experiment_name}/embeddings.jsonl
+  models:
+    - name: "all-MiniLM-L6-v2"
+      vector_size: 384
+      field_name: "dense_embedding"
+    - name: "all-mpnet-base-v2"
+      vector_size: 768
+      field_name: "dense_mpnet"
+    - name: "multilingual-e5-large-v2"
+      vector_size: 1024
+      field_name: "dense_e5"
+    - name: "GTE-Qwen2-7B-instruct"
+      vector_size: 1536
+      field_name: "dense_gte"
+    - name: "BGE-M3"
+      vector_size: 1024
+      field_name: "dense_bge"
+    - name: "jina-embeddings-v3"
+      vector_size: 1024
+      field_name: "dense_jina"
+    - name: "SPECTER2"
+      vector_size: 768
+      field_name: "dense_specter"
+    - name: "SciBERT"
+      vector_size: 768
+      field_name: "dense_scibert"
+  batch_size: 100
+  checkpoint_interval: 10
+  default_model: "all-MiniLM-L6-v2"
 
 chunking:
   chunk_size: 512
@@ -7,17 +38,11 @@ chunking:
   chunk_dir: ${experiments.mlflow.experiment_name}/chunking.jsonl
   chunking_type: full_text
 
-embeddings:
-  embedding_dir: ${experiments.mlflow.experiment_name}/embeddings.jsonl
-  model_name: all-MiniLM-L6-v2
-  batch_size: 100
-  checkpoint_interval: 10
-
 test_data:
   test_data_dir: ${experiments.mlflow.experiment_name}/test_data.jsonl
   test_data_size: 10
   max_questions_per_paper: 3
-  test_type: llm
+  test_type: base
 
 qdrant:
   host: qdrant
@@ -32,4 +57,31 @@ generator:
   max_new_tokens: 256
 
 retriever:
-  top_k: 5
+  type: "hybrid" # Options: "dense", "sparse", "hybrid"
+  top_k: 7
+
+  dense:
+    embedding_model: "all-MiniLM-L6-v2"
+    normalize_embeddings: true
+
+  sparse:
+    method: "bm25" # Options: "bm25", "tfidf"
+    use_qdrant_corpus: true
+    tfidf_params:
+      lowercase: true
+      stop_words: "english"
+      ngram_range: [1, 2]
+      min_df: 1
+      max_df: 0.9
+    bm25_params:
+      k1: 1.2
+      b: 0.75
+      epsilon: 0.25
+
+  hybrid:
+    fusion_method: "weighted_sum" # Options: "weighted_sum", "rank_fusion", "rrf"
+    dense_weight: 0.7
+    sparse_weight: 0.3
+    normalize_scores: true
+    deduplicate: true
+    rank_fusion_k: 100

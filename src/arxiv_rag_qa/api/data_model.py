@@ -100,13 +100,13 @@ class TestDataResponse(BaseModel):
 class TaskStatusResponse(BaseModel):
     id: str
     task_type: str
-    status: str  # pending, processing, completed, failed
+    status: str
     created_at: datetime | None
     started_at: datetime | None
     completed_at: datetime | None
     error_message: str | None
     progress: int
-    result_data: str | None  # JSON string
+    result_data: str | None
 
 
 class TaskListResponse(BaseModel):

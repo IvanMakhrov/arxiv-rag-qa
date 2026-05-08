@@ -14,3 +14,16 @@ dag:
 
 minio:
   bucket_name: rag-data
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  enable_cache: true
+  cache_config:
+    base_ttl: 3600
+    max_ttl: 86400
+    min_ttl: 600
+    frequency_decay: 0.95
+    key_prefix: "rag:embedding:"
+    frequency_prefix: "rag:frequency:"

@@ -33,5 +33,5 @@ k8s.sh
 k8s.md
 
 # RAG Kaggle
-results/
-notebooks/RAG.ipynb
+experiments/
+thesis/

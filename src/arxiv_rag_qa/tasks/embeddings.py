@@ -2,7 +2,9 @@ import json
 from datetime import datetime
 
 from arxiv_rag_qa.celery_config import celery_app
-from arxiv_rag_qa.data.generate_embeddings import generate_embeddings
+from arxiv_rag_qa.rag.generate_embeddings import (
+    generate_embeddings_single_model as generate_embeddings,
+)
 from arxiv_rag_qa.tasks.base import DatabaseTask
 
 

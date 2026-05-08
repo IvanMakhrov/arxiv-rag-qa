@@ -3,6 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY . .
+RUN pip install --no-cache-dir jinja2==3.0.3 fastapi==0.104.1 starlette==0.27.0
 RUN pip install --no-cache-dir -e .[api]
 
 EXPOSE 8000
