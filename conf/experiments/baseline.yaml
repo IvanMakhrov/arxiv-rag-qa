@@ -53,8 +53,15 @@ qdrant:
   batch_size: 512
 
 generator:
+  type: local
   model_name: Qwen/Qwen2.5-0.5B-Instruct
   max_new_tokens: 256
+  local:
+    load_in_4bit: true
+  openrouter:
+    max_tokens: 256
+    temperature: 0.0
+    timeout: 120
 
 retriever:
   type: "hybrid" # Options: "dense", "sparse", "hybrid"

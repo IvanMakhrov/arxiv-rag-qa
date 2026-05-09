@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Any
 
 import boto3
@@ -9,7 +10,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from arxiv_rag_qa.eval.eval_retriever import create_eval_retriever
 from arxiv_rag_qa.eval.llm_judge import evaluate_llm_metrics
-from arxiv_rag_qa.rag.generator import QwenGenerator
+from arxiv_rag_qa.rag.generator import create_generator
 from utils.setup_logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -108,22 +109,39 @@ def generator_eval(  # noqa: PLR0913
         hybrid_config=hybrid_config or {},
         sparse_params=sparse_params or {},
     )
-    generator = QwenGenerator(model_name=gen_model_name)
+    generator_config = {
+        "type": "local",
+        "model_name": gen_model_name,
+    }
+    generator = create_generator(generator_config)
 
     predictions = []
     references = []
     contexts = []
-    questions_list = []  # For LLM-as-judge
+    questions_list = []
+    all_num_tokens: list[int] = []
+
+    total_retrieve_time = 0.0
+    total_generate_time = 0.0
+    sample_count = len(test_samples)
 
     for i, sample in enumerate(test_samples):
-        logger.info(f"\rGenerating {i + 1}/{len(test_samples)}")
+        logger.info(f"\rGenerating {i + 1}/{sample_count}")
 
+        t0 = time.perf_counter()
         docs = retriever.retrieve(sample["question"], top_k=top_k)
+        retrieve_time = time.perf_counter() - t0
+        total_retrieve_time += retrieve_time
+
         context = "\n\n".join([doc["payload"]["text"] for doc in docs])
 
-        pred = generator.generate(sample["question"], context)
+        t0 = time.perf_counter()
+        pred, num_tokens = generator.generate(sample["question"], context)
+        generate_time = time.perf_counter() - t0
+        total_generate_time += generate_time
 
         predictions.append(pred)
+        all_num_tokens.append(num_tokens)
         references.append(sample["answer"])
         contexts.append(context)
         questions_list.append(sample["question"])
@@ -140,11 +158,34 @@ def generator_eval(  # noqa: PLR0913
         model=llm_judge_model,
     )
 
+    total_time = total_retrieve_time + total_generate_time
+    avg_latency_seconds = total_time / sample_count
+    avg_retrieve_time = total_retrieve_time / sample_count
+    avg_generate_time = total_generate_time / sample_count
+
+    total_tokens = sum(all_num_tokens)
+    avg_tokens_per_sample = total_tokens / sample_count if sample_count else 0
+    tokens_per_second = total_tokens / total_generate_time if total_generate_time > 0 else 0.0
+    tokens_per_second_e2e = total_tokens / total_time if total_time > 0 else 0.0
+
+    throughput_qps = sample_count / total_time if total_time > 0 else 0.0
+
     all_metrics = {
         "rougeL": rouge["rougeL"],
         "bleu": bleu,
         "bertscore_f1": bert_f1,
         **llm_metrics,
+        "e2e_latency_avg": avg_latency_seconds,
+        "e2e_latency_avg_ms": avg_latency_seconds * 1000,
+        "retrieve_latency_avg": avg_retrieve_time,
+        "generate_latency_avg": avg_generate_time,
+        "tokens_per_second": tokens_per_second,
+        "tokens_per_second_e2e": tokens_per_second_e2e,
+        "total_tokens_generated": total_tokens,
+        "avg_tokens_per_sample": avg_tokens_per_sample,
+        "throughput_qps": throughput_qps,
+        "total_eval_time": total_time,
+        "sample_count": sample_count,
     }
 
     logger.info(
@@ -152,6 +193,13 @@ def generator_eval(  # noqa: PLR0913
         f"Metrics: ROUGE-L: {rouge['rougeL']:.4f}, BLEU: {bleu:.4f}, "
         f"BERTScore F1: {bert_f1:.4f}, "
         f"LLM Judge: {', '.join([f'{k}: {v:.4f}' for k, v in llm_metrics.items()])}"
+    )
+    logger.info(
+        f"Perf: Avg E2E latency: {avg_latency_seconds:.2f}s, "
+        f"Token throughput: {tokens_per_second:.2f} tok/s (generate), "
+        f"{tokens_per_second_e2e:.2f} tok/s (E2E), "
+        f"Avg {avg_tokens_per_sample:.1f} tok/sample, "
+        f"Avg retrieve: {avg_retrieve_time:.2f}s, Avg generate: {avg_generate_time:.2f}s"
     )
 
     return {

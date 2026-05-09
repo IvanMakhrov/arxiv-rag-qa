@@ -141,3 +141,4 @@ docker compose up
 - GET - / - UI RAG системы
 - GET - /task/{task_id} - Получить статус задачи в UI
 - GET - /health - Состояние api
+- GET - /metrics - Метрики Latency и Throughput

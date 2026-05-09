@@ -25,7 +25,7 @@ from arxiv_rag_qa.api.eval_model import (
     GeneratorEvalRequest,
     RetrieverEvalRequest,
 )
-from arxiv_rag_qa.api.middleware import LatencyMiddleware
+from arxiv_rag_qa.api.middleware import LatencyMiddleware, throughput_tracker
 from arxiv_rag_qa.api.qdrant_model import QdrantRequest
 from arxiv_rag_qa.api.rag_model import RagRequest
 from arxiv_rag_qa.celery_config import celery_app
@@ -327,6 +327,25 @@ async def get_rag_response_json(  # noqa: PLR0913
 async def health_check():
     """Health endpoint for nginx/Docker"""
     return {"status": "healthy", "service": "rag-service"}
+
+
+@app.get("/metrics")
+async def metrics():
+    """Real-time throughput and latency metrics."""
+    stats = throughput_tracker.get_stats()
+    return {
+        "service": "rag-service",
+        "throughput": {
+            "rps": stats["rps"],
+            "requests_in_window": stats["total_requests_in_window"],
+            "window_seconds": stats["window_seconds"],
+        },
+        "latency": {
+            "avg_ms": stats["avg_latency_ms"],
+            "p50_ms": stats["p50_latency_ms"],
+            "p99_ms": stats["p99_latency_ms"],
+        },
+    }
 
 
 @app.post("/download-papers", response_model=dict)

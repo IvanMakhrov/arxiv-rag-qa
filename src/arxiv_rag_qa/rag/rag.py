@@ -1,10 +1,11 @@
 import logging
 from typing import Any
 
+import torch
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 
-from arxiv_rag_qa.rag.generator import QwenGenerator
+from arxiv_rag_qa.rag.generator import create_generator
 from arxiv_rag_qa.rag.hybrid_retriever import HybridRetriever
 from arxiv_rag_qa.rag.pipeline import RAGPipeline
 from arxiv_rag_qa.rag.retriever import DenseRetriever
@@ -184,10 +185,21 @@ def get_response(
     else:
         raise ValueError(f"Unknown retriever type: {retriever_type}")
 
-    generator = QwenGenerator(
-        model_name=gen_model_name,
-        load_in_4bit=kwargs.get("load_in_4bit", True),
-    )
+    generator_config = {
+        "type": kwargs.get("generator_type", "local"),
+        "model_name": gen_model_name,
+        "local": {
+            "load_in_4bit": kwargs.get("load_in_4bit", True),
+            "device": kwargs.get("device", "cuda" if torch.cuda.is_available() else "cpu"),
+        },
+        "openrouter": {
+            "api_key": kwargs.get("openrouter_api_key"),
+            "max_tokens": kwargs.get("max_new_tokens", 256),
+            "temperature": kwargs.get("temperature", 0.0),
+            "timeout": kwargs.get("openrouter_timeout", 120),
+        },
+    }
+    generator = create_generator(generator_config)
 
     rag = RAGPipeline(retriever=retriever, generator=generator)
     return rag.run(query)
@@ -225,6 +237,7 @@ def get_response_advanced(config: dict[str, Any], query: str, qdrant_client=None
         emb_model_name = config.get("embeddings", {}).get("default_model", "all-MiniLM-L6-v2")
 
     gen_model_name = generator_config.get("model_name", "Qwen/Qwen2.5-0.5B-Instruct")
+    gen_type = generator_config.get("type", "local")
 
     qdrant_config = config.get("qdrant", {})
     qdrant_host = qdrant_config.get("host", "localhost")
@@ -233,6 +246,9 @@ def get_response_advanced(config: dict[str, Any], query: str, qdrant_client=None
     sparse_section = retriever_config.get("sparse", {})
     hybrid_section = retriever_config.get("hybrid", {})
     dense_section = retriever_config.get("dense", {})
+
+    local_gen_config = generator_config.get("local", {})
+    openrouter_gen_config = generator_config.get("openrouter", {})
 
     extra_kwargs = {
         "sparse": sparse_section,
@@ -243,6 +259,13 @@ def get_response_advanced(config: dict[str, Any], query: str, qdrant_client=None
         "redis_port": kwargs.get("redis_port", 6379),
         "redis_db": kwargs.get("redis_db", 0),
         "enable_redis_cache": kwargs.get("enable_redis_cache", True),
+        "generator_type": gen_type,
+        "load_in_4bit": local_gen_config.get("load_in_4bit", True),
+        "device": local_gen_config.get("device", "cuda" if torch.cuda.is_available() else "cpu"),
+        "openrouter_api_key": openrouter_gen_config.get("api_key"),
+        "openrouter_timeout": openrouter_gen_config.get("timeout", 120),
+        "max_new_tokens": generator_config.get("max_new_tokens", 256),
+        "temperature": openrouter_gen_config.get("temperature", 0.0),
     }
 
     return get_response(

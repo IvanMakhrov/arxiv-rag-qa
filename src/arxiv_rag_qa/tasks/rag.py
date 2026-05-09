@@ -40,6 +40,9 @@ def get_rag_response_task(self, request_data):
             embedding_model=embedding_model,
         )
 
+        timing = response.get("timing", {})
+        token_usage = response.get("token_usage", {})
+
         result_data = {
             "answer": response.get("answer", ""),
             "sources": response.get("sources", []),
@@ -55,6 +58,15 @@ def get_rag_response_task(self, request_data):
             "hybrid_config": hybrid_config,
             "sparse_params": sparse_params,
             "embedding_model": embedding_model,
+            "timing": {
+                "retrieve_time_s": timing.get("retrieve_time_s"),
+                "generate_time_s": timing.get("generate_time_s"),
+                "total_time_s": timing.get("total_time_s"),
+            },
+            "token_usage": {
+                "generated_tokens": token_usage.get("generated_tokens"),
+                "tokens_per_second": token_usage.get("tokens_per_second"),
+            },
         }
 
         self.update_task_status(
